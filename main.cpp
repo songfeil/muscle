@@ -3,6 +3,7 @@
 #include <igl/read_triangle_mesh.h>
 #include <igl/opengl/glfw/Viewer.h>
 #include "generate_bone.h"
+#include "bezier.h"
 #include <iostream>
 
 int main(int argc, char *argv[])
@@ -20,8 +21,10 @@ int main(int argc, char *argv[])
 
   generate_bone(Eigen::Vector3d(0, 0, 0), Eigen::Vector3d(1, 3, 5), V, F);
 
-  std::cout << V << std::endl << std::endl;
-  std::cout << F << std::endl;
+    Eigen::MatrixXd B;
+    bezier(Eigen::Vector3d(0, 0, 0), Eigen::Vector3d(0, 1, 2.5), Eigen::Vector3d(0, 0, 5), 10, B);
+
+  std::cout << B << std::endl;
 
   // Create a libigl Viewer object 
   igl::opengl::glfw::Viewer viewer;
