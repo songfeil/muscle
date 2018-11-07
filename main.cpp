@@ -9,16 +9,18 @@ int main(int argc, char *argv[])
 {
   Eigen::MatrixXd V;
   Eigen::MatrixXi F;
-//  // Load in a mesh
-//  igl::read_triangle_mesh(argc>1 ? argv[1] : "../shared/data/bunny.off", V, F);
+  // Load in a mesh
+//  igl::read_triangle_mesh(argc>1 ? argv[1] : "../shared/data/knight.off", V, F);
+
 //
 //  Eigen::MatrixXi E = edges(F);
 //  int Chi = euler_characteristic(F);
 //  std::cout<<"Edge list E is "<<E.rows()<<"x"<<E.cols()<<std::endl;
 //  std::cout<<"Euler Characteristic: "<<Chi<<std::endl;
 
-  generate_bone(Eigen::Vector3d(0, 0, 0), Eigen::Vector3d(0, 0, 5), V, F);
+  generate_bone(Eigen::Vector3d(0, 0, 0), Eigen::Vector3d(1, 3, 5), V, F);
 
+  std::cout << V << std::endl << std::endl;
   std::cout << F << std::endl;
 
   // Create a libigl Viewer object 

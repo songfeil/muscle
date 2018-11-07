@@ -6,15 +6,15 @@ void generate_bone(const Eigen::Vector3d &p0,
                    Eigen::MatrixXd &V,
                    Eigen::MatrixXi &F) {
   // Magic number
-  int part = 1;
+  int part = 3;
 
   Eigen::Vector3d vec = (p1 - p0) / part;
   Eigen::Vector3d u, v;
-  u = Eigen::Vector3d(0, 1, vec(1) / vec(2)).normalized();
+  u = Eigen::Vector3d(0, 1, - vec(1) / vec(2)).normalized();
   v = u.cross(vec).normalized();
 
   V.resize(4 * (part + 1), 3);
-  Eigen::Vector3d points[] = {p0, p0 + u, p0 + v, p0 + u + v};
+  Eigen::Vector3d points[] = {p0, p0 + u, p0 + u + v, p0 + v};
 
   // Generating vertices
   for (int i = 0; i < part + 1; i++) {
