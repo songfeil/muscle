@@ -12,6 +12,6 @@ void cylinder(
       int part,
       Eigen::MatrixXd & V,
       Eigen::MatrixXi & F
-    )
+    );
 
 #endif //INTRODUCTION_CYLINDER_H

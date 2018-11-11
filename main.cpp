@@ -9,6 +9,7 @@
 #include <igl/unproject_ray.h>
 #include <igl/combine.h>
 #include <Eigen/Geometry>
+#include "cylinder.h"
 #include <iostream>
 
 int main(int argc, char *argv[])
@@ -27,10 +28,15 @@ int main(int argc, char *argv[])
   // OUR CODE HERE!
   //generate_bone(Eigen::Vector3d(0, 0, 0), Eigen::Vector3d(1, 3, 5), V, F);
 
-  Eigen::MatrixXd B;
-  bezier(Eigen::Vector3d(0, 0, 0), Eigen::Vector3d(0, 1, 2.5), Eigen::Vector3d(0, 0, 5), 10, B);
+  Eigen::MatrixXd B, N;
+  bezier(Eigen::Vector3d(0, 0, 0), Eigen::Vector3d(0, 1, 2.5), Eigen::Vector3d(0, 0, 5), 10, B, N);
 
-  std::cout << B << std::endl;
+//  std::cout << B << std::endl;
+  Eigen::MatrixXd CV;
+  Eigen::MatrixXi CF;
+  cylinder(12, 22, CV, CF);
+  VV.push_back(CV);
+  FF.push_back(CF);
 
   // Create a libigl Viewer object 
   igl::opengl::glfw::Viewer viewer;
@@ -90,18 +96,18 @@ int main(int argc, char *argv[])
       n_bp++;
       // For every 2 points, generate a bone
       if (n_bp == 2){
-        std::cout << "GEN BONE!" << std::endl;
+//        std::cout << "GEN BONE!" << std::endl;
         Eigen::MatrixXd V;
         Eigen::MatrixXi F;
         Eigen::Vector3d p1 = bone_points.row(bone_points.rows() - 1);
         Eigen::Vector3d p2 = bone_points.row(bone_points.rows() - 2);
         generate_bone(p1, p2, V, F);
-        std::cout << "all bone points: \n" << bone_points << std::endl;
-        std::cout << "new V: \n" << V << std::endl;
+//        std::cout << "all bone points: \n" << bone_points << std::endl;
+//        std::cout << "new V: \n" << V << std::endl;
         // Add to list of meshes
         VV.push_back(V);
         FF.push_back(F);
-        std::cout << "num meshes: \n" << VV.size() << std::endl;
+//        std::cout << "num meshes: \n" << VV.size() << std::endl;
         n_bp = 0;
       }
       update();
@@ -109,6 +115,8 @@ int main(int argc, char *argv[])
     }
     return false;
   };
+
+
 
 
   viewer.callback_key_pressed = 
