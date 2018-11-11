@@ -10,8 +10,8 @@
 void cylinder(
       int div,
       int part,
-      Eigen::MatrixXd & V,
-      Eigen::MatrixXi & F
+      Eigen::MatrixXd & LV,
+      Eigen::MatrixXi & LF
     );
 
 #endif //INTRODUCTION_CYLINDER_H
