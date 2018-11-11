@@ -10,6 +10,9 @@
 #include <igl/combine.h>
 #include <Eigen/Geometry>
 #include "cylinder.h"
+#include "deform.h"
+#include "pick_constrain_point.h"
+#include <vector>
 #include <iostream>
 
 int main(int argc, char *argv[])
@@ -28,13 +31,14 @@ int main(int argc, char *argv[])
   // OUR CODE HERE!
   //generate_bone(Eigen::Vector3d(0, 0, 0), Eigen::Vector3d(1, 3, 5), V, F);
 
-  Eigen::MatrixXd B, N;
-  bezier(Eigen::Vector3d(0, 0, 0), Eigen::Vector3d(0, 1, 2.5), Eigen::Vector3d(0, 0, 5), 10, B, N);
+  Eigen::MatrixXd B;
+  bezier(Eigen::Vector3d(0, 0, 0), Eigen::Vector3d(0, 1, 2.5), Eigen::Vector3d(0, 0, 5), 10, B);
 
 //  std::cout << B << std::endl;
   Eigen::MatrixXd CV;
   Eigen::MatrixXi CF;
-  cylinder(12, 22, CV, CF);
+//  cylinder(12, 22, CV, CF);
+  deform(Eigen::Vector3d(0, 0, 0), Eigen::Vector3d(5, 5, 0), Eigen::Vector3d(0, 5, 0), CV, CF);
   VV.push_back(CV);
   FF.push_back(CF);
 
