@@ -10,7 +10,7 @@ void generate_bone(const Eigen::Vector3d &p0,
 
   Eigen::Vector3d vec = (p1 - p0) / part;
   Eigen::Vector3d u, v;
-  u = Eigen::Vector3d(0, 1, - vec(1) / vec(2)).normalized();
+  u = Eigen::Vector3d(- vec(1) / vec(0), 1, 0).normalized();
   v = u.cross(vec).normalized();
 
   V.resize(4 * (part + 1), 3);

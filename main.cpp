@@ -9,16 +9,40 @@
 #include <igl/unproject_ray.h>
 #include <igl/combine.h>
 #include <Eigen/Geometry>
+#include "cylinder.h"
 #include <iostream>
+#include "generate_muscle.h"
 
 int main(int argc, char *argv[])
 {
-  std::vector<Eigen::MatrixXd> VV;
-  std::vector<Eigen::MatrixXi> FF;
-  std::vector<Eigen::MatrixXd> BB;
+  std::vector<Eigen::MatrixXd> VV; // vector of vertex matrices for all meshes
+  std::vector<Eigen::MatrixXi> FF; // vector of face matrices for all meshes
+  // Load in a mesh
+//  igl::read_triangle_mesh(argc>1 ? argv[1] : "../shared/data/knight.off", V, F);
+
+//
+//  Eigen::MatrixXi E = edges(F);
+//  int Chi = euler_characteristic(F);
+//  std::cout<<"Edge list E is "<<E.rows()<<"x"<<E.cols()<<std::endl;
+//  std::cout<<"Euler Characteristic: "<<Chi<<std::endl;
+
+  // OUR CODE HERE!
+  //generate_bone(Eigen::Vector3d(0, 0, 0), Eigen::Vector3d(1, 3, 5), V, F);
+
+  // Eigen::MatrixXd B, N;
+  // bezier(Eigen::Vector3d(0, 0, 0), Eigen::Vector3d(0, 1, 2.5), Eigen::Vector3d(0, 0, 5), 10, B, N);
+
+//  std::cout << B << std::endl;
+  Eigen::MatrixXd CV;
+  Eigen::MatrixXi CF;
+  cylinder(12, 22, CV, CF);
+  VV.push_back(CV);
+  FF.push_back(CF);
 
   // Create a libigl Viewer object 
   igl::opengl::glfw::Viewer viewer;
+  std::cout << "========= MUSCLE/BONE GENERATION =========" << std::endl;
+  std::cout << " B,b \t Bone input mode \n M,m \t Muscle input mode \n[space]  No mode (can drag around scene again)" << std::endl;
 
   // Color consts
   const Eigen::RowVector3d orange(1.0,0.7,0.2);
@@ -31,13 +55,13 @@ int main(int argc, char *argv[])
   {
     NONE = 0,
     BONE = 1,
-    CURVE = 2,
-  } mode = CURVE;
+    MUSCLE = 2,
+  } mode = NONE;
 
   // User input data
   Eigen::Vector3d last_mouse;
   Eigen::MatrixXd bone_points;
-  Eigen::MatrixXd curve_points;
+  Eigen::MatrixXd muscle_points;
   int n_bp = 0;
   int n_cp = 0;
 
@@ -56,8 +80,8 @@ int main(int argc, char *argv[])
         viewer.data().set_mesh(V,F);
       }
     }
-    else if (mode == CURVE) {
-      viewer.data().set_points(curve_points, blue);
+    else if (mode == MUSCLE) {
+      viewer.data().set_points(muscle_points, blue);
     }
   };
 
@@ -65,7 +89,6 @@ int main(int argc, char *argv[])
     [&](igl::opengl::glfw::Viewer&, int, int)->bool
   {
     if (mode > 0) {
-      std::cout << "mode: " << mode << std::endl;
       // Ray cast to x-y plane
       last_mouse = Eigen::Vector3d(viewer.current_mouse_x,viewer.core.viewport(3)-viewer.current_mouse_y,0);
       Eigen::Vector3d source, dir, intersection;
@@ -100,44 +123,48 @@ int main(int argc, char *argv[])
           n_bp = 0;
         }
       }
-        else if (mode == CURVE) {
-          // Add intersection to list of curve points
-          std::cout << "curve?" << std::endl;
-          curve_points.conservativeResize(curve_points.rows() + 1, 3);
-          curve_points.row(curve_points.rows() - 1) = intersection;
-          std::cout << curve_points << std::endl;
+        else if (mode == MUSCLE) {
+          // Add intersection to list of muscle points
+          muscle_points.conservativeResize(muscle_points.rows() + 1, 3);
+          muscle_points.row(muscle_points.rows() - 1) = intersection;
           n_cp++;
-          // For every 3 points, generate a curve
+          // For every 3 points, generate a muscle!
           if (n_cp == 3) {
-            Eigen::Vector3d p1 = curve_points.row(curve_points.rows() - 1);
-            Eigen::Vector3d p2 = curve_points.row(curve_points.rows() - 2);
-            Eigen::Vector3d p3 = curve_points.row(curve_points.rows() - 3);
-            Eigen::MatrixXd B;
-            bezier(p1, p2, p3, 10, B);
-            BB.push_back(B);
+            Eigen::MatrixXd V, B, N;
+            Eigen::MatrixXi F;
+            Eigen::Vector3d p1 = muscle_points.row(muscle_points.rows() - 1);
+            Eigen::Vector3d p2 = muscle_points.row(muscle_points.rows() - 2);
+            Eigen::Vector3d p3 = muscle_points.row(muscle_points.rows() - 3);
+            bezier(p1, p2, p3, 10, B, N); 
+            // Uncomment these when generate_muscle works!
+            // generate_muscle(B, N, V, F);
+            // VV.push_back(V);
+            // FF.push_back(F);
+            std::cout << "generate muscle" << std::endl;
             n_cp = 0;
-            std::cout << "B \n" << B << std::endl;
           }
         }
         update();
         return true;
+
       }
     return false;
   };
-
 
   viewer.callback_key_pressed = 
     [&](igl::opengl::glfw::Viewer &, unsigned int key, int mod)
   {
     switch(key) {
+      case 'B':
       case 'b':
       {
         mode = BONE;
         break;
       }
-      case 'c':
+      case 'M':
+      case 'm':
       {
-        mode = CURVE;
+        mode = MUSCLE;
         break;
       }
       case ' ':
