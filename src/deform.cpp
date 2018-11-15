@@ -49,8 +49,8 @@ void deform(
 //    Eigen::VectorXi bb = Eigen::VectorXi::Map(b.data(), b.size());;
     Eigen::VectorXi bb = Eigen::VectorXi(5);
     bb << 0, 4, 8, 12, 16;
-    Eigen::MatrixXd Bc;
-    bezier(p0, p2, p1, 4, Bc);
+    Eigen::MatrixXd Bc, N;
+    bezier(p0, p2, p1, 4, Bc, N);
     igl::ARAPData data;
     igl::arap_precomputation(V, F, 3, bb, data);
     igl::arap_solve(Bc, data, V);

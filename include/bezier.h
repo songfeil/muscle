@@ -11,6 +11,7 @@ void bezier(const Eigen::Vector3d & p0,
             const Eigen::Vector3d & p1,
             const Eigen::Vector3d & p2,
             const int n,
-            Eigen::MatrixXd & B);
+            Eigen::MatrixXd & B,
+            Eigen::MatrixXd & N);
 
 #endif //INTRODUCTION_BEZIER_H

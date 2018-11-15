@@ -5,7 +5,9 @@
 
 #include "Eigen/Core"
 
-void volume_along_curve(const Eigen::VectorXd curve,
-                        Eigen::MatrixXd volume);
+void volume_along_curve(const Eigen::MatrixXd & curve,
+                        const Eigen::MatrixXd & normal,
+                        Eigen::MatrixXd & volume,
+                        Eigen::MatrixXd & pointNormal);
 
 #endif //INTRODUCTION_VOLUME_ALONG_CURVE_H

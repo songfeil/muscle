@@ -16,6 +16,8 @@
 #include <iostream>
 #include "generate_muscle.h"
 #include "gaussian.h"
+#include "volume_along_curve.h"
+#include "poisson_surface_reconstruction.h"
 
 int main(int argc, char *argv[])
 {
@@ -37,8 +39,8 @@ int main(int argc, char *argv[])
   gaussian(10, 1, 3, 1, G);
   gaussian(10, 1, 3, 2, G);
 
-  Eigen::MatrixXd B;
-  bezier(Eigen::Vector3d(0, 0, 0), Eigen::Vector3d(0, 1, 2.5), Eigen::Vector3d(0, 0, 5), 10, B);
+  Eigen::MatrixXd B, N;
+  bezier(Eigen::Vector3d(0, 0, 0), Eigen::Vector3d(0, 1, 2.5), Eigen::Vector3d(0, 0, 5), 10, B, N);
 
 
 //  std::cout << B << std::endl;
@@ -153,6 +155,11 @@ int main(int argc, char *argv[])
             Eigen::Vector3d p2 = muscle_points.row(muscle_points.rows() - 2);
             Eigen::Vector3d p3 = muscle_points.row(muscle_points.rows() - 3);
             // Your code here to populate V and F
+            Eigen::MatrixXd Bc, Nc, pV, pN;
+            bezier(p1, p2, p2, 4, Bc, Nc);
+            volume_along_curve(Bc, Nc, pV, pN);
+//            std::cout << pV << std::endl;
+            //poisson_surface_reconstruction(pV, pN, V, F);
             deform(p1, p2, p3, V, F);
             VV.push_back(V);
             FF.push_back(F);
