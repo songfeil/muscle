@@ -156,11 +156,12 @@ int main(int argc, char *argv[])
             Eigen::Vector3d p3 = muscle_points.row(muscle_points.rows() - 3);
             // Your code here to populate V and F
             Eigen::MatrixXd Bc, Nc, pV, pN;
-            bezier(p1, p2, p2, 4, Bc, Nc);
+            bezier(p1, p2, p3, 4, Bc, Nc);
+//            bezier(Eigen::Vector3d(0, 0, 0), Eigen::Vector3d(0, 1, 2.5), Eigen::Vector3d(0, 0, 5), 10, Bc, Nc);
             volume_along_curve(Bc, Nc, pV, pN);
             std::cout << pV << std::endl;
-            //poisson_surface_reconstruction(pV, pN, V, F);
-            deform(p1, p2, p3, V, F);
+            poisson_surface_reconstruction(pV, pN, V, F);
+//            deform(p1, p2, p3, V, F);
             VV.push_back(V);
             FF.push_back(F);
             std::cout << "generate muscle" << std::endl;

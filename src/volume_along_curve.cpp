@@ -47,9 +47,9 @@ void volume_along_curve(const Eigen::MatrixXd & curve,
     int circleSampleCount = 10;
     Eigen::MatrixXd circle2D;
     generate_circle(circleSampleCount, circle2D);
-    volume.resize(normal.rows() * circleSampleCount, 3);
-    pointNormal.resize(normal.rows() * circleSampleCount, 3);
-    for (int i = 0; i < normal.rows(); i++) {
+    volume.resize(n * circleSampleCount, 3);
+    pointNormal.resize(n * circleSampleCount, 3);
+    for (int i = 0; i < n; i++) {
       Eigen::Vector3d N, T, B, pos;
       N = normal.row(i);
       pos = normal.row(i);
@@ -59,6 +59,8 @@ void volume_along_curve(const Eigen::MatrixXd & curve,
       Eigen::MatrixXd transform = Eigen::MatrixXd(3, 2);
       transform.col(0) = T;
       transform.col(1) = B;
+      std::cout << "Normal " << N << std::endl;
+      std::cout << transform << std::endl << std::endl;
 
       Eigen::MatrixXd scaleCircle2D = radii(i) * circle2D;
       Eigen::MatrixXd tCircle = (transform * scaleCircle2D.transpose()).transpose();
