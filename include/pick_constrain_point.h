@@ -6,6 +6,7 @@
 #define INTRODUCTION_PICK_CONSTRAIN_POINT_H
 
 #include <Eigen/Core>
+#include <vector>
 
 void pick_constrain_point(
         const Eigen::MatrixXd & V,
