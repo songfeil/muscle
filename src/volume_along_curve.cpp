@@ -4,23 +4,24 @@
 #include <iostream>
 
 void generate_circle(const int n, Eigen::MatrixXd & V) {
-  V.resize(n, 2);
+  V = Eigen::MatrixXd::Zero(n, 2);
   for (int i = 0; i < n; i++) {
-    double theta = (double)i / n;
+    double theta = ((double)i / n) * 2 * M_PI;
     V.row(i) = Eigen::Vector2d(cos(theta), sin(theta));
   }
 }
 
 void tangent(const Eigen::Vector3d & N, Eigen::Vector3d & T, Eigen::Vector3d & B) {
+  Eigen::Vector3d nn = N.normalized();
   Eigen::Vector3d x = Eigen::Vector3d(1, 0, 0);
   Eigen::Vector3d z = Eigen::Vector3d(0, 0, 1);
 
-  if (abs(N(0)) < 0.1 && abs(N(1)) < 0.1) {
-    T = (N.cross(x)).normalized();
+  if (abs(nn(0)) < 0.1 && abs(nn(1)) < 0.1) {
+    T = (nn.cross(x)).normalized();
   } else {
-    T = (N.cross(z)).normalized();
+    T = (nn.cross(z)).normalized();
   }
-  B = (N.cross(T)).normalized();
+  B = (nn.cross(T)).normalized();
 }
 
 void volume_along_curve(const Eigen::MatrixXd & curve,
@@ -44,14 +45,15 @@ void volume_along_curve(const Eigen::MatrixXd & curve,
     // Either way we need to find normals to points on the curve
     // For now, our curves only exist on the X-Y plane (z = 0 for all points) just based on the user interface
     // So we can use that to our advantage, and generalize it later...
-    int circleSampleCount = 10;
+    int circleSampleCount = 15;
     Eigen::MatrixXd circle2D;
     generate_circle(circleSampleCount, circle2D);
-    volume.resize(n * circleSampleCount, 3);
-    pointNormal.resize(n * circleSampleCount, 3);
+    volume = Eigen::MatrixXd::Zero(n * circleSampleCount, 3);
+    pointNormal = Eigen::MatrixXd::Zero(n * circleSampleCount, 3);
     for (int i = 0; i < n; i++) {
       Eigen::Vector3d N, T, B, pos;
       N = normal.row(i);
+      N.normalize();
       pos = normal.row(i);
 
       tangent(N, T, B);
@@ -62,8 +64,13 @@ void volume_along_curve(const Eigen::MatrixXd & curve,
       std::cout << "Normal " << N << std::endl;
       std::cout << transform << std::endl << std::endl;
 
-      Eigen::MatrixXd scaleCircle2D = radii(i) * circle2D;
+      Eigen::MatrixXd scaleCircle2D = 0.25 * circle2D;
       Eigen::MatrixXd tCircle = (transform * scaleCircle2D.transpose()).transpose();
+//      Eigen::MatrixXd tCircle = Eigen::MatrixXd(circle2D.rows(), 3);
+//      for (int j = 0; j < tCircle.rows(); j++) {
+//        Eigen::Vector3d pt = circle2D.row(j);
+//        tCircle.row(j) = transform * pt;
+//      }
       for (int j = 0; j < tCircle.rows(); j++) {
         tCircle.row(j) += curve.row(i);
         volume.row(i * circleSampleCount + j) = tCircle.row(j);
