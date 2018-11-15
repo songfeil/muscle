@@ -15,6 +15,7 @@
 #include <vector>
 #include <iostream>
 #include "generate_muscle.h"
+#include "gaussian.h"
 
 int main(int argc, char *argv[])
 {
@@ -32,17 +33,21 @@ int main(int argc, char *argv[])
   // OUR CODE HERE!
   //generate_bone(Eigen::Vector3d(0, 0, 0), Eigen::Vector3d(1, 3, 5), V, F);
 
+  Eigen::VectorXd G;
+  gaussian(10, 1, 3, 1, G);
+  gaussian(10, 1, 3, 2, G);
+
   Eigen::MatrixXd B;
   bezier(Eigen::Vector3d(0, 0, 0), Eigen::Vector3d(0, 1, 2.5), Eigen::Vector3d(0, 0, 5), 10, B);
 
 
 //  std::cout << B << std::endl;
-  Eigen::MatrixXd CV;
-  Eigen::MatrixXi CF;
-//  cylinder(12, 22, CV, CF);
-  deform(Eigen::Vector3d(0, 0, 0), Eigen::Vector3d(5, 5, 0), Eigen::Vector3d(0, 5, 0), CV, CF);
-  VV.push_back(CV);
-  FF.push_back(CF);
+//   Eigen::MatrixXd CV;
+//   Eigen::MatrixXi CF;
+// //  cylinder(12, 22, CV, CF);
+//   deform(Eigen::Vector3d(0, 0, 0), Eigen::Vector3d(5, 5, 0), Eigen::Vector3d(0, 5, 0), CV, CF);
+//   VV.push_back(CV);
+//   FF.push_back(CF);
 
   // Create a libigl Viewer object 
   igl::opengl::glfw::Viewer viewer;
@@ -86,7 +91,14 @@ int main(int argc, char *argv[])
       }
     }
     else if (mode == MUSCLE) {
+      viewer.data().clear();
       viewer.data().set_points(muscle_points, blue);
+      if (VV.size() > 0) {
+        Eigen::MatrixXd V;
+        Eigen::MatrixXi F;
+        igl::combine(VV,FF,V,F);
+        viewer.data().set_mesh(V,F);
+      }
     }
   };
 
@@ -141,8 +153,9 @@ int main(int argc, char *argv[])
             Eigen::Vector3d p2 = muscle_points.row(muscle_points.rows() - 2);
             Eigen::Vector3d p3 = muscle_points.row(muscle_points.rows() - 3);
             // Your code here to populate V and F
-            // VV.push_back(V);
-            // FF.push_back(F);
+            deform(p1, p2, p3, V, F);
+            VV.push_back(V);
+            FF.push_back(F);
             std::cout << "generate muscle" << std::endl;
             n_cp = 0;
           }
