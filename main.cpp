@@ -158,7 +158,7 @@ int main(int argc, char *argv[])
             Eigen::MatrixXd Bc, Nc, pV, pN;
             bezier(p1, p2, p2, 4, Bc, Nc);
             volume_along_curve(Bc, Nc, pV, pN);
-//            std::cout << pV << std::endl;
+            std::cout << pV << std::endl;
             //poisson_surface_reconstruction(pV, pN, V, F);
             deform(p1, p2, p3, V, F);
             VV.push_back(V);
