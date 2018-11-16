@@ -1,5 +1,19 @@
-#include "generate_bone.h"
+#include "generate_bones.h"
 #include <Eigen/Geometry>
+
+void generate_bones(const Eigen::MatrixXd & points,
+                    std::vector<Eigen::MatrixXd> & VV,
+                    std::vector<Eigen::MatrixXi> & FF) {
+  
+  // Create bones p(i) and p(i-1)
+  for (int i = 1; i < points.rows(); i++) {
+    Eigen::MatrixXd V;
+    Eigen::MatrixXi F;
+    generate_bone(points.row(i - 1), points.row(i), V, F);
+    VV.push_back(V);
+    FF.push_back(F);
+  }
+}
 
 void generate_bone(const Eigen::Vector3d &p0,
                    const Eigen::Vector3d &p1,

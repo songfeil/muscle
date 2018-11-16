@@ -2,7 +2,7 @@
 #include "euler_characteristic.h"
 #include <igl/read_triangle_mesh.h>
 #include <igl/opengl/glfw/Viewer.h>
-#include "generate_bone.h"
+#include "generate_bones.h"
 #include "bezier.h"
 #include "ray_intersect_plane.h"
 #include <igl/unproject.h>
@@ -18,6 +18,8 @@
 #include "gaussian.h"
 #include "volume_along_curve.h"
 #include "poisson_surface_reconstruction.h"
+//#include <igl/copyleft/cgal/mesh_boolean.h>
+
 
 int main(int argc, char *argv[])
 {
@@ -128,19 +130,28 @@ int main(int argc, char *argv[])
         // Add intersection to list of bone points
         bone_points.conservativeResize(bone_points.rows() + 1, 3);
         bone_points.row(bone_points.rows() - 1) = intersection;
-        n_bp++;
-        // For every 2 points, generate a bone
-        if (n_bp == 2){
-          Eigen::MatrixXd V;
-          Eigen::MatrixXi F;
-          Eigen::Vector3d p1 = bone_points.row(bone_points.rows() - 1);
-          Eigen::Vector3d p2 = bone_points.row(bone_points.rows() - 2);
-          generate_bone(p1, p2, V, F);
-          // Add to list of meshes
-          VV.push_back(V);
-          FF.push_back(F);
-          n_bp = 0;
-        }
+        // n_bp++;
+        // // For every 2 points, generate a bone
+        // if (n_bp == 2){
+        //   Eigen::MatrixXd V;
+        //   Eigen::MatrixXi F;
+        //   Eigen::Vector3d p1 = bone_points.row(bone_points.rows() - 1);
+        //   Eigen::Vector3d p2 = bone_points.row(bone_points.rows() - 2);
+        //   generate_bone(p1, p2, V, F);
+        //   // Add to list of meshes
+        //   VV.push_back(V);
+        //   FF.push_back(F);
+        //   n_bp = 0;
+          // if (VV.size() == 2) {
+          //   Eigen::MatrixXd Vnew;
+          //   Eigen::MatrixXi Fnew;
+          //   igl::copyleft::cgal::mesh_boolean(VV.at(0),FF.at(0),VV.at(1),FF.at(1),FB,MESH_BOOLEAN_TYPE_MINUS,Vnew,Fnew);
+          //   VV.clear();
+          //   FF.clear();
+          //   VV.push_back(Vnew);
+          //   FF.push_back(Fnew);
+          ///}
+        //}
       }
         else if (mode == MUSCLE) {
           // Add intersection to list of muscle points
@@ -197,6 +208,14 @@ int main(int argc, char *argv[])
       {
         mode = NONE;
         break;
+      }
+      case 'G':
+      case 'g':
+      {
+        if (mode == BONE) {
+          generate_bones(bone_points, VV, FF);
+        }
+        break
       }
     }
     update();
