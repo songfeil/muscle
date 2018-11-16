@@ -20,8 +20,8 @@ void bezier(const Eigen::Vector3d & p0,
     B.resize(n + 1, 3);
     N.resize(n + 1, 3);
     for (int i = 0; i < n + 1; i++ ) {
-        B.row(i) = bfunc((double) i / n);
-        N.row(i) = nfunc((double) i / n);
+        B.row(i) = bfunc(0.1 + 0.8 * ((double) i / n));
+        N.row(i) = nfunc(0.1 + 0.8 * ((double) i / n));
     }
 
 }

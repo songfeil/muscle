@@ -3,12 +3,8 @@
 //
 
 #include "cylinder.h"
-#include <generator/generator.hpp>
-#include <generator/CylinderMesh.hpp>
 #include <iostream>
 #include <igl/cylinder.h>
-
-using namespace generator;
 
 void cylinder(
     int div,
