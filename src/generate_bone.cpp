@@ -20,7 +20,7 @@ void generate_bone(const Eigen::Vector3d &p0,
                    Eigen::MatrixXd &V,
                    Eigen::MatrixXi &F) {
   // Magic number
-  int part = 4;
+  int part = 10;
 
   Eigen::Vector3d vec = (p1 - p0) / part;
   Eigen::Vector3d u, v;

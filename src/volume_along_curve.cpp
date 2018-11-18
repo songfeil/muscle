@@ -64,7 +64,11 @@ void volume_along_curve(const Eigen::MatrixXd & curve,
       std::cout << "Normal " << N << std::endl;
       std::cout << transform << std::endl << std::endl;
 
-      Eigen::MatrixXd scaleCircle2D = 0.25 * circle2D;
+      auto radiusFunc = [](double max, double t){
+          return max * (-3 * (t - 0.5) * (t - 0.5) + 1);
+      };
+
+      Eigen::MatrixXd scaleCircle2D = radiusFunc(0.5, (double)i/n) * circle2D;
       Eigen::MatrixXd tCircle = (transform * scaleCircle2D.transpose()).transpose();
 //      Eigen::MatrixXd tCircle = Eigen::MatrixXd(circle2D.rows(), 3);
 //      for (int j = 0; j < tCircle.rows(); j++) {
