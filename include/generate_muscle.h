@@ -6,10 +6,10 @@
 #define INTRODUCTION_GENERATE_MUSCLE_H
 
 #include <Eigen/Core>
+#include <vector>
 
-void generate_bone(const Eigen::MatrixXd & B,
-                   const Eigen::MatrixXd & N,
-                   Eigen::MatrixXd & V,
-                   Eigen::MatrixXi & F);
+void generate_muscle(const Eigen::MatrixXd & points,
+                    std::vector<Eigen::MatrixXd> & VV,
+                    std::vector<Eigen::MatrixXi> & FF);
 
 #endif //INTRODUCTION_GENERATE_MUSCLE_H
