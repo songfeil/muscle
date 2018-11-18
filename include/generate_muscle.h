@@ -7,9 +7,13 @@
 
 #include <Eigen/Core>
 #include <vector>
+#include <set>
 
 void generate_muscle(const Eigen::MatrixXd & points,
-                    std::vector<Eigen::MatrixXd> & VV,
-                    std::vector<Eigen::MatrixXi> & FF);
+                     const Eigen::MatrixXd & V,
+                     const Eigen::MatrixXi & F,
+                     const std::set<int> & selected_faces,
+                     std::vector<Eigen::MatrixXd> & VV,
+                     std::vector<Eigen::MatrixXi> & FF);
 
 #endif //INTRODUCTION_GENERATE_MUSCLE_H
