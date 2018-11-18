@@ -5,7 +5,7 @@
 #include "triangle_hunt.h"
 #include <limits>
 
-void triangle_hunt(Eigen::Matrix3d & P, Eigen::MatrixXd & V, Eigen::MatrixXd & F) {
+void triangle_hunt(Eigen::Matrix3d & P, Eigen::MatrixXd & V, Eigen::MatrixXi & F) {
   Eigen::RowVector3d triangleCenter = (P.row(0) + P.row(1) + P.row(2)) / 3.0;
   double dist = std::numeric_limits<double>::infinity();
   int fi = -1;

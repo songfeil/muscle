@@ -2,7 +2,7 @@
 #include "euler_characteristic.h"
 #include <igl/read_triangle_mesh.h>
 #include <igl/opengl/glfw/Viewer.h>
-#include "generate_bones.h"
+#include "generate_bone.h"
 #include "bezier.h"
 #include "ray_intersect_plane.h"
 #include <igl/unproject.h>
@@ -20,13 +20,7 @@
 #include "gaussian.h"
 #include "volume_along_curve.h"
 #include "poisson_surface_reconstruction.h"
-<<<<<<< HEAD
-//#include <igl/copyleft/cgal/mesh_boolean.h>
-
-=======
 #include <Eigen/Sparse>
->>>>>>> 6f1ce7d7581fdcaff65c3b0c1b3bdeaa8a018bf7
-
 int main(int argc, char *argv[])
 {
   std::vector<Eigen::MatrixXd> VV; // vector of vertex matrices for all meshes
@@ -232,7 +226,7 @@ int main(int argc, char *argv[])
         if (mode == BONE) {
           generate_bones(bone_points, VV, FF);
         }
-        break
+        break;
       }
     }
     update();

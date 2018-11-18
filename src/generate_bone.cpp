@@ -1,4 +1,4 @@
-#include "generate_bones.h"
+#include "generate_bone.h"
 #include <Eigen/Geometry>
 
 void generate_bones(const Eigen::MatrixXd & points,

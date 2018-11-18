@@ -9,6 +9,6 @@
 
 //P is a 3 * 3 matrix containing a mesh triangle, where every row is position of vertex.
 
-void triangle_hunt(Eigen::Matrix3d & P, Eigen::MatrixXd & V, Eigen::MatrixXd & F);
+void triangle_hunt(Eigen::Matrix3d & P, Eigen::MatrixXd & V, Eigen::MatrixXi & F);
 
 #endif //INTRODUCTION_TRIANGLE_HUNT_H
