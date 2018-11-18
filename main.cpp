@@ -21,10 +21,29 @@
 #include "volume_along_curve.h"
 #include "poisson_surface_reconstruction.h"
 #include <Eigen/Sparse>
+#include <igl/unproject_onto_mesh.h>
+
+// Mode consts
+enum Mode
+{
+  NONE = 0,
+  BONE = 1,
+  MUSCLE = 2,
+  FACE_SELECT = 3,
+};
+
+std::vector<Eigen::MatrixXd> VV;
+std::vector<Eigen::MatrixXi> FF;
+Eigen::MatrixXd V;
+Eigen::MatrixXi F;
+std::set<int> selected_faces;
+Eigen::MatrixXd face_colors;
+Mode mode;
+
 int main(int argc, char *argv[])
 {
-  std::vector<Eigen::MatrixXd> VV; // vector of vertex matrices for all meshes
-  std::vector<Eigen::MatrixXi> FF; // vector of face matrices for all meshes
+   // vector of vertex matrices for all meshes
+   // vector of face matrices for all meshes
   // Load in a mesh
 //  igl::read_triangle_mesh(argc>1 ? argv[1] : "../shared/data/knight.off", V, F);
 
@@ -36,6 +55,7 @@ int main(int argc, char *argv[])
 
   // OUR CODE HERE!
   //generate_bone(Eigen::Vector3d(0, 0, 0), Eigen::Vector3d(1, 3, 5), V, F);
+  mode = NONE;
 
   Eigen::VectorXd G;
   gaussian(10, 1, 3, 1, G);
@@ -64,14 +84,6 @@ int main(int argc, char *argv[])
   const Eigen::RowVector3d blue(0.2,0.3,0.8);
   const Eigen::RowVector3d green(0.2,0.6,0.3);
 
-  // Mode consts
-  enum Mode
-  {
-    NONE = 0,
-    BONE = 1,
-    MUSCLE = 2,
-  } mode = NONE;
-
   // User input data
   Eigen::Vector3d last_mouse;
   Eigen::MatrixXd bone_points;
@@ -88,31 +100,60 @@ int main(int argc, char *argv[])
       // Setting multiple meshes
       // http://www.alecjacobson.com/weblog/?p=4679
       if (VV.size() > 0) {
-        Eigen::MatrixXd V;
-        Eigen::MatrixXi F;
         igl::combine(VV,FF,V,F);
+        face_colors.resize(F.rows(), 3);
+        for (int i = 0; i < F.rows(); i++) {
+          face_colors.row(i) = green;
+        }
         viewer.data().set_mesh(V,F);
+        viewer.data().set_colors(face_colors);
       }
     }
     else if (mode == MUSCLE) {
       viewer.data().clear();
       viewer.data().set_points(muscle_points, blue);
       if (VV.size() > 0) {
-        Eigen::MatrixXd V;
-        Eigen::MatrixXi F;
         igl::combine(VV,FF,V,F);
+        face_colors.resize(F.rows(), 3);
+        for (int i = 0; i < F.rows(); i++) {
+          face_colors.row(i) = green;
+        }
         viewer.data().set_mesh(V,F);
+        viewer.data().set_colors(face_colors);
       }
+    }
+    else if ( mode == FACE_SELECT) {
+      viewer.data().set_colors(face_colors);
     }
   };
 
   viewer.callback_mouse_down = 
     [&](igl::opengl::glfw::Viewer&, int, int)->bool
   {
-    if (mode > 0) {
+    if ( mode > 0) {
       // Ray cast to x-y plane
       last_mouse = Eigen::Vector3d(viewer.current_mouse_x,viewer.core.viewport(3)-viewer.current_mouse_y,0);
-      Eigen::Vector3d source, dir, intersection;
+      if ( mode == FACE_SELECT) {
+        // Find closest point on mesh to mouse position
+        int fid;
+        Eigen::Vector3f bary;
+        Eigen::RowVector2f mouse;
+        mouse << last_mouse.head(2)(0), last_mouse.head(2)(1);
+        if(igl::unproject_onto_mesh(
+          mouse,
+          viewer.core.view,
+          viewer.core.proj, 
+          viewer.core.viewport, 
+          V, F, 
+          fid, bary))
+        {
+          // selected face! color it
+          selected_faces.insert(fid);
+          face_colors.row(fid) = orange;
+        }
+      }
+      else {
+        Eigen::Vector3d source, dir, intersection;
       Eigen::Vector2d p;
       p << last_mouse.head(2)(0), last_mouse.head(2)(1);
       igl::unproject_ray(
@@ -126,7 +167,7 @@ int main(int argc, char *argv[])
                           source,
                           dir,
                           intersection);
-      if (mode == BONE) {
+      if ( mode == BONE) {
         // Add intersection to list of bone points
         bone_points.conservativeResize(bone_points.rows() + 1, 3);
         bone_points.row(bone_points.rows() - 1) = intersection;
@@ -153,7 +194,7 @@ int main(int argc, char *argv[])
           ///}
         //}
       }
-        else if (mode == MUSCLE) {
+        else if ( mode == MUSCLE) {
           // Add intersection to list of muscle points
           muscle_points.conservativeResize(muscle_points.rows() + 1, 3);
           muscle_points.row(muscle_points.rows() - 1) = intersection;
@@ -192,9 +233,9 @@ int main(int argc, char *argv[])
             n_cp = 0;
           }
         }
+      }
         update();
         return true;
-
       }
     return false;
   };
@@ -206,24 +247,29 @@ int main(int argc, char *argv[])
       case 'B':
       case 'b':
       {
-        mode = BONE;
+         mode = BONE;
         break;
       }
       case 'M':
       case 'm':
       {
-        mode = MUSCLE;
+         mode = MUSCLE;
         break;
       }
       case ' ':
       {
-        mode = NONE;
+         mode = NONE;
+        break;
+      }
+      case 'f':
+      {
+         mode = FACE_SELECT;
         break;
       }
       case 'G':
       case 'g':
       {
-        if (mode == BONE) {
+        if ( mode == BONE) {
           generate_bones(bone_points, VV, FF);
         }
         break;
@@ -232,7 +278,6 @@ int main(int argc, char *argv[])
     update();
     return true;
   };
-    
 
   // Launch a viewer instance
   viewer.launch();
