@@ -8,6 +8,8 @@
 #include <igl/unproject.h>
 #include <igl/unproject_ray.h>
 #include <igl/combine.h>
+#include <igl/cotmatrix.h>
+#include <igl/massmatrix.h>
 #include <Eigen/Geometry>
 #include "cylinder.h"
 #include "deform.h"
@@ -18,8 +20,12 @@
 #include "gaussian.h"
 #include "volume_along_curve.h"
 #include "poisson_surface_reconstruction.h"
+<<<<<<< HEAD
 //#include <igl/copyleft/cgal/mesh_boolean.h>
 
+=======
+#include <Eigen/Sparse>
+>>>>>>> 6f1ce7d7581fdcaff65c3b0c1b3bdeaa8a018bf7
 
 int main(int argc, char *argv[])
 {
@@ -172,8 +178,19 @@ int main(int argc, char *argv[])
             volume_along_curve(Bc, Nc, pV, pN);
             Eigen::MatrixXd All(pV.rows(), 6);
             All << pV, pN;
-            std::cout << All << std::endl;
             poisson_surface_reconstruction(pV, pN, V, F);
+            // Smooth the surface
+//              Eigen::MatrixXd Vcpy(V);
+//              Eigen::SparseMatrix<double> L, M;
+//              igl::cotmatrix(V, F, L);
+//              igl::massmatrix(V, F, igl::MASSMATRIX_TYPE_BARYCENTRIC, M);
+//              Eigen::SimplicialLDLT<Eigen::SparseMatrix<double>> solver(M);
+//              Eigen::SparseMatrix<double> MinvL = solver.solve(L);
+//              Eigen::SparseMatrix<double> QL = L.transpose()*MinvL;
+//              const double al = 8e-2;
+//              Eigen::SimplicialLDLT<Eigen::SparseMatrix<double>> lapSolver(al*QL + (1.-al)*M);
+//              V = lapSolver.solve(al*M*Vcpy);
+//              std::cout << V << std::endl;
 //            deform(p1, p2, p3, V, F);
             VV.push_back(V);
             FF.push_back(F);
