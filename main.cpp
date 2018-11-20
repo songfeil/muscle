@@ -1,8 +1,6 @@
 #include <igl/opengl/glfw/Viewer.h>
 #include <igl/unproject_ray.h>
 #include <igl/combine.h>
-#include <igl/cotmatrix.h>
-#include <igl/massmatrix.h>
 #include <igl/unproject_onto_mesh.h>
 
 #include <Eigen/Geometry>
@@ -14,6 +12,7 @@
 #include "generate_bone.h"
 #include "generate_muscle.h"
 #include "ray_intersect_plane.h"
+#include "inflate_muscle.h"
 
 /* Input mode enum */
 enum Mode
@@ -189,6 +188,19 @@ int main(int argc, char *argv[])
         if ( mode == BONE) {
           generate_bones(control_points, VV, FF);
         }
+        break;
+      }
+      case 'i':
+      {
+        Eigen::MatrixXd Vnew;
+        Eigen::MatrixXi Fnew;
+        Eigen::MatrixXd muscle_mesh = VV.back(); // Assuming muscle was last mesh added
+        int start = V.rows() - muscle_mesh.rows();
+        int end = V.rows();
+        inflate_muscle(V, F, start, end, Vnew);
+        VV.pop_back();
+        VV.push_back(Vnew);
+        std::cout << "INFLATE" << std::endl;
         break;
       }
     }
