@@ -20,4 +20,11 @@ void generate_bones(const Eigen::MatrixXd & points,
                     std::vector<Eigen::MatrixXd> & VV,
                     std::vector<Eigen::MatrixXi> & FF);
 
+void transform_flinstone_bone(const Eigen::Vector3d &p0,
+                   const Eigen::Vector3d &p1,
+                   Eigen::MatrixXd &V);
+
+void start_flinstone_bone(const Eigen::Vector3d &p,
+                   Eigen::MatrixXd &V);
+
 #endif //INTRODUCTION_GENERATE_BONE_H
