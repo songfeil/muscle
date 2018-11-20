@@ -2,6 +2,7 @@
 #include <igl/unproject_ray.h>
 #include <igl/combine.h>
 #include <igl/unproject_onto_mesh.h>
+#include <igl/read_triangle_mesh.h>
 
 #include <Eigen/Geometry>
 #include <Eigen/Sparse>
@@ -45,6 +46,10 @@ Eigen::Vector3d last_mouse;
 Eigen::MatrixXd control_points;
 int n_points = 0;
 
+Eigen::MatrixXd Vbone;
+Eigen::MatrixXi Fbone;
+Eigen::Vector3d bp0;
+
 
 int main(int argc, char *argv[])
 {
@@ -53,6 +58,9 @@ int main(int argc, char *argv[])
   igl::opengl::glfw::Viewer viewer;
   std::cout << "========= MUSCLE/BONE GENERATION =========" << std::endl;
   std::cout << " B,b \t Bone input mode \n M,m \t Muscle input mode \n[space]  No mode (can drag around scene again)" << std::endl;
+
+  // Import our template bone mesh
+  igl::read_triangle_mesh("../data/bone.obj",Vbone,Fbone);
   
   /* Define update functions for viewer */
   const auto & update = [&]()
@@ -121,7 +129,22 @@ int main(int argc, char *argv[])
 
         /* BONE */
         if (mode == BONE) {
-
+          
+          if (n_points == 0) {
+            Eigen::MatrixXd Vnew = Vbone.replicate(1, 1);
+            start_flinstone_bone(intersection, Vnew);
+            VV.push_back(Vnew);
+            FF.push_back(Fbone);
+            bp0 = intersection;
+            n_points++;
+          } 
+          else if (n_points == 1) {
+            Eigen::MatrixXd Vnew = Vbone.replicate(1, 1);
+            transform_flinstone_bone(bp0, intersection, Vnew);
+            VV.pop_back();
+            VV.push_back(Vnew);
+            n_points = 0;
+          }
           control_points.conservativeResize(control_points.rows() + 1, 3);
           control_points.row(control_points.rows() - 1) = intersection;
 
@@ -149,6 +172,27 @@ int main(int argc, char *argv[])
 
     return false;
 
+  };
+
+  viewer.callback_mouse_move = 
+    [&](igl::opengl::glfw::Viewer&, int, int)->bool
+  {
+    if ((mode == BONE) && (n_points == 1)) {
+      last_mouse = Eigen::Vector3d(viewer.current_mouse_x,viewer.core.viewport(3)-viewer.current_mouse_y,0);
+      Eigen::Vector3d source, dir, intersection;
+      Eigen::Vector2d p;
+      p << last_mouse.head(2)(0), last_mouse.head(2)(1);
+      igl::unproject_ray(p, viewer.core.view, viewer.core.proj, viewer.core.viewport, source, dir);
+      ray_intersect_plane(Eigen::Vector3d(0, 0, 0), Eigen::Vector3d(0, 0, 1), source, dir, intersection);
+
+      Eigen::MatrixXd Vnew = Vbone.replicate(1, 1);
+      transform_flinstone_bone(bp0, intersection, Vnew);
+      VV.pop_back();
+      VV.push_back(Vnew);
+      update();
+      return true;
+    }
+    return false;
   };
 
   /* Key presses */
