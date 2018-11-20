@@ -9,7 +9,7 @@
 #include "volume_along_curve.h"
 #include "poisson_surface_reconstruction.h"
 #include "triangle_hunt.h"
-#include "deform.h"
+#include <igl/per_face_normals.h>
 
 void generate_muscle(const Eigen::MatrixXd & points,
                      const Eigen::MatrixXd & V,
@@ -17,62 +17,90 @@ void generate_muscle(const Eigen::MatrixXd & points,
                      const std::set<int> & selected_faces,
                      std::vector<Eigen::MatrixXd> & VV,
                      std::vector<Eigen::MatrixXi> & FF) {
-
-  Eigen::MatrixXd Vm;
-  Eigen::MatrixXi Fm;
-  Eigen::Vector3d p1 = points.row(points.rows() - 1);
-  Eigen::Vector3d p2 = points.row(points.rows() - 2);
-  Eigen::Vector3d p3 = points.row(points.rows() - 3);
-  // Your code here to populate V and F
-  Eigen::MatrixXd Bc, Nc, pV, pN;
-  bezier(p1, p2, p3, 50, Bc, Nc);
+    Eigen::MatrixXd Vm;
+    Eigen::MatrixXi Fm;
+    Eigen::Vector3d p1 = points.row(points.rows() - 1);
+    Eigen::Vector3d p2 = points.row(points.rows() - 2);
+    Eigen::Vector3d p3 = points.row(points.rows() - 3);
+    // Your code here to populate V and F
+    Eigen::MatrixXd Bc, Nc, pV, pN;
+    bezier(p1, p2, p3, 50, Bc, Nc);
 //            bezier(Eigen::Vector3d(0, 0, 0), Eigen::Vector3d(0, 1, 2.5), Eigen::Vector3d(0, 0, 5), 10, Bc, Nc);
-  volume_along_curve(Bc, Nc, pV, pN);
-  Eigen::MatrixXd All(pV.rows(), 6);
-  All << pV, pN;
-  poisson_surface_reconstruction(pV, pN, Vm, Fm);
+    volume_along_curve(Bc, Nc, pV, pN);
+    Eigen::MatrixXd All(pV.rows(), 6);
+    All << pV, pN;
+    poisson_surface_reconstruction(pV, pN, Vm, Fm);
 
-  Eigen::VectorXi bb = Eigen::VectorXi(6);
-  Eigen::MatrixXd Bcc(6, 3);
+    Eigen::VectorXi bb = Eigen::VectorXi(6);
+    Eigen::MatrixXd Bonedest(6, 3);
+    Eigen::MatrixXd musclef(6, 3);
 
-  for (auto it = selected_faces.begin(); it != selected_faces.end(); ++it) {
+    for (auto it = selected_faces.begin(); it != selected_faces.end(); ++it) {
+        int curr = std::distance(selected_faces.begin(), it);
+        Eigen::RowVectorXi triangle = F.row(*it);
+        std::cout<<triangle<<std::endl;
+        Eigen::Matrix3d P = Eigen::Matrix3d::Zero();
+        P.row(0) = V.row(triangle(0));
+        P.row(1) = V.row(triangle(1));
+        P.row(2) = V.row(triangle(2));
+        std::cout<<"selected triangle"<<std::endl;
+        std::cout<<P<<std::endl;
+        int fi = triangle_hunts(P, Vm, Fm);
+        Eigen::RowVector3i f = Fm.row(fi);
 
-    Eigen::RowVectorXi triangle = F.row(*it);
-    std::cout<<triangle<<std::endl;
-    Eigen::Matrix3d P = Eigen::Matrix3d::Zero();
-    P.row(0) = V.row(triangle(0));
-    P.row(1) = V.row(triangle(1));
-    P.row(2) = V.row(triangle(2));
-    std::cout<<"selected triangle"<<std::endl;
-    std::cout<<P<<std::endl;
-    int fi = triangle_hunts(P, Vm, Fm);
-    Eigen::RowVector3i f = Fm.row(fi);
-    int curr = std::distance(selected_faces.begin(), it);
-    Bcc.row(3*curr) = P.row(2);
-    Bcc.row(3*curr+1) = P.row(1);
-    Bcc.row(3*curr+2) = P.row(0);
-    bb(3*curr) = Fm(fi, 2);
-    bb(3*curr+1) = Fm(fi, 1);
-    bb(3*curr+2) = Fm(fi, 0);
-  }
+        Bonedest.row(3*curr) = P.row(2);
+        Bonedest.row(3*curr+1) = P.row(1);
+        Bonedest.row(3*curr+2) = P.row(0);
 
-  igl::ARAPData data;
-  igl::arap_precomputation(Vm, Fm, 3, bb, data);
-  igl::arap_solve(Bcc, data, Vm);
-  //Smooth the surface
-          //    Eigen::MatrixXd Vcpy(V);
-          //    Eigen::SparseMatrix<double> L, M;
-          //    igl::cotmatrix(V, F, L);
-          //    igl::massmatrix(V, F, igl::MASSMATRIX_TYPE_BARYCENTRIC, M);
-          //    Eigen::SimplicialLDLT<Eigen::SparseMatrix<double>> solver(M);
-          //    Eigen::SparseMatrix<double> MinvL = solver.solve(L);
-          //    Eigen::SparseMatrix<double> QL = L.transpose()*MinvL;
-          //    const double al = 8e-2;
-          //    Eigen::SimplicialLDLT<Eigen::SparseMatrix<double>> lapSolver(al*QL + (1.-al)*M);
-          //    V = lapSolver.solve(al*M*Vcpy);
-          //    std::cout << V << std::endl;
-          //  deform(p1, p2, p3, V, F);
-  VV.push_back(Vm);
-  FF.push_back(Fm);
-  std::cout << "generate muscle" << std::endl;
+        double minlensum = std::numeric_limits<double>::infinity();
+        // Determine the optimal correspondence of vertices
+        for (int i = 0; i < 3; i++) {
+            double lensum = (P.row(2) - Vm.row(Fm(fi, i))).norm()
+                            +(P.row(1) - Vm.row(Fm(fi, (i+1)%3 ))).norm()
+                            +(P.row(0) - Vm.row(Fm(fi, (i+2)%3 ))).norm();
+            if (lensum < minlensum) {
+                minlensum = lensum;
+                bb(3*curr) = Fm(fi, i);
+                bb(3*curr+1) = Fm(fi, (i+1)%3);
+                bb(3*curr+2) = Fm(fi, (i+2)%3);
+                musclef.row(3*curr) = Vm.row(bb(3*curr));
+                musclef.row(3*curr+1) = Vm.row(bb(3*curr+1));
+                musclef.row(3*curr+2) = Vm.row(bb(3*curr+2));
+
+            }
+        }
+
+//        bb(3*curr) = Fm(fi, 0);
+//        bb(3*curr+1) = Fm(fi, 1);
+//        bb(3*curr+2) = Fm(fi, 2);
+//        musclef.row(3*curr) = Vm.row(bb(3*curr));
+//        musclef.row(3*curr+1) = Vm.row(bb(3*curr+1));
+//        musclef.row(3*curr+2) = Vm.row(bb(3*curr+2));
+    }
+    igl::ARAPData data;
+    igl::arap_precomputation(Vm, Fm, 3, bb, data);
+    int ninterp = 10;
+    for (int ni = 1; ni <= ninterp; ni++) {
+        double t = double (ni) / double (ninterp);
+        //std::cout<< (1-t)*Fcc + t*Bcc <<std::endl;
+        Eigen::MatrixXd currdest = (1-t)*musclef + t*Bonedest;
+        igl::arap_solve(currdest, data, Vm);
+    }
+//    igl::arap_solve(Bcc, data, Vm);
+    // Smooth the surface
+//              Eigen::MatrixXd Vcpy(V);
+//              Eigen::SparseMatrix<double> L, M;
+//              igl::cotmatrix(V, F, L);
+//              igl::massmatrix(V, F, igl::MASSMATRIX_TYPE_BARYCENTRIC, M);
+//              Eigen::SimplicialLDLT<Eigen::SparseMatrix<double>> solver(M);
+//              Eigen::SparseMatrix<double> MinvL = solver.solve(L);
+//              Eigen::SparseMatrix<double> QL = L.transpose()*MinvL;
+//              const double al = 8e-2;
+//              Eigen::SimplicialLDLT<Eigen::SparseMatrix<double>> lapSolver(al*QL + (1.-al)*M);
+//              V = lapSolver.solve(al*M*Vcpy);
+//              std::cout << V << std::endl;
+//            deform(p1, p2, p3, V, F);
+    VV.push_back(Vm);
+    FF.push_back(Fm);
+    std::cout << "generate muscle" << std::endl;
 }
