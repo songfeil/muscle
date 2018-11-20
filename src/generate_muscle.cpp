@@ -9,6 +9,7 @@
 #include "volume_along_curve.h"
 #include "poisson_surface_reconstruction.h"
 #include "triangle_hunt.h"
+#include <igl/per_face_normals.h>
 
 void generate_muscle(const Eigen::MatrixXd & points,
                      const Eigen::MatrixXd & V,
@@ -31,9 +32,11 @@ void generate_muscle(const Eigen::MatrixXd & points,
     poisson_surface_reconstruction(pV, pN, Vm, Fm);
 
     Eigen::VectorXi bb = Eigen::VectorXi(6);
-    Eigen::MatrixXd Bcc(6, 3);
+    Eigen::MatrixXd Bonedest(6, 3);
+    Eigen::MatrixXd musclef(6, 3);
 
     for (auto it = selected_faces.begin(); it != selected_faces.end(); ++it) {
+        int curr = std::distance(selected_faces.begin(), it);
         Eigen::RowVectorXi triangle = F.row(*it);
         std::cout<<triangle<<std::endl;
         Eigen::Matrix3d P = Eigen::Matrix3d::Zero();
@@ -44,17 +47,46 @@ void generate_muscle(const Eigen::MatrixXd & points,
         std::cout<<P<<std::endl;
         int fi = triangle_hunts(P, Vm, Fm);
         Eigen::RowVector3i f = Fm.row(fi);
-        int curr = std::distance(selected_faces.begin(), it);
-        Bcc.row(3*curr) = P.row(2);
-        Bcc.row(3*curr+1) = P.row(1);
-        Bcc.row(3*curr+2) = P.row(0);
-        bb(3*curr) = Fm(fi, 2);
-        bb(3*curr+1) = Fm(fi, 1);
-        bb(3*curr+2) = Fm(fi, 0);
+
+        Bonedest.row(3*curr) = P.row(2);
+        Bonedest.row(3*curr+1) = P.row(1);
+        Bonedest.row(3*curr+2) = P.row(0);
+
+        double minlensum = std::numeric_limits<double>::infinity();
+        // Determine the optimal correspondence of vertices
+        for (int i = 0; i < 3; i++) {
+            double lensum = (P.row(2) - Vm.row(Fm(fi, i))).norm()
+                    +(P.row(1) - Vm.row(Fm(fi, (i+1)%3 ))).norm()
+                    +(P.row(0) - Vm.row(Fm(fi, (i+2)%3 ))).norm();
+            if (lensum < minlensum) {
+                minlensum = lensum;
+                bb(3*curr) = Fm(fi, i);
+                bb(3*curr+1) = Fm(fi, (i+1)%3);
+                bb(3*curr+2) = Fm(fi, (i+2)%3);
+                musclef.row(3*curr) = Vm.row(bb(3*curr));
+                musclef.row(3*curr+1) = Vm.row(bb(3*curr+1));
+                musclef.row(3*curr+2) = Vm.row(bb(3*curr+2));
+
+            }
+        }
+
+//        bb(3*curr) = Fm(fi, 0);
+//        bb(3*curr+1) = Fm(fi, 1);
+//        bb(3*curr+2) = Fm(fi, 2);
+//        musclef.row(3*curr) = Vm.row(bb(3*curr));
+//        musclef.row(3*curr+1) = Vm.row(bb(3*curr+1));
+//        musclef.row(3*curr+2) = Vm.row(bb(3*curr+2));
     }
     igl::ARAPData data;
     igl::arap_precomputation(Vm, Fm, 3, bb, data);
-    igl::arap_solve(Bcc, data, Vm);
+    int ninterp = 10;
+    for (int ni = 1; ni <= ninterp; ni++) {
+        double t = double (ni) / double (ninterp);
+        //std::cout<< (1-t)*Fcc + t*Bcc <<std::endl;
+        Eigen::MatrixXd currdest = (1-t)*musclef + t*Bonedest;
+        igl::arap_solve(currdest, data, Vm);
+    }
+//    igl::arap_solve(Bcc, data, Vm);
     // Smooth the surface
 //              Eigen::MatrixXd Vcpy(V);
 //              Eigen::SparseMatrix<double> L, M;
