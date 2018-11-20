@@ -96,7 +96,10 @@ void transform_flinstone_bone(const Eigen::Vector3d &p0,
 void start_flinstone_bone(const Eigen::Vector3d &p,
                           Eigen::MatrixXd &V) {
   // It's a small mesh, so I'm just going to scale it up a bit to start
-  Eigen::MatrixXd scale = Eigen::MatrixXd::Identity(3, 3) * 2.0;
+  Eigen::MatrixXd scale(3,3);
+  scale << 1.0, 0.0, 0.0,
+           0.0, 2.0, 0.0,
+           0.0, 0.0, 2.0;
   V = V * scale;
   // Find the length of the bone
   double bone_length_x = V.col(0).maxCoeff() - V.col(0).minCoeff();
