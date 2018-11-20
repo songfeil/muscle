@@ -69,10 +69,10 @@ void transform_flinstone_bone(const Eigen::Vector3d &p0,
   for (int i = 0; i < V.rows(); i++) { //translate
     V(i, 1) -= bone_length_y/2.0;
   }
-  // Find along length (x)
+  // Find stretch along length (x)
   Eigen::Vector3d vec = p1 - p0;
   double stretch_x_coeff = vec.norm() / bone_length_x;
-  if (stretch_x_coeff < 0.5) {
+  if (stretch_x_coeff < 0.5) { // If too small, don't shrink it past half its size, to avoid some crazyness
     stretch_x_coeff = 0.5;
   }
   // Find rotation
@@ -101,8 +101,7 @@ void start_flinstone_bone(const Eigen::Vector3d &p,
            0.0, 2.0, 0.0,
            0.0, 0.0, 2.0;
   V = V * scale;
-  // Find the length of the bone
-  double bone_length_x = V.col(0).maxCoeff() - V.col(0).minCoeff();
+  // Find the height of the bone
   double bone_length_y = V.col(1).maxCoeff() - V.col(1).minCoeff();
   // Find translation
   Eigen::Vector3d t = p + Eigen::Vector3d(0, -bone_length_y/2.0, 0);
