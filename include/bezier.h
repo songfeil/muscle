@@ -7,10 +7,11 @@
 
 #include "Eigen/Core"
 
-void bezier(const Eigen::Vector3d & p0,
-            const Eigen::Vector3d & p1,
-            const Eigen::Vector3d & p2,
-            const int n,
+void bezier(const Eigen::MatrixXd & p,
+//            const Eigen::Vector3d & p1,
+//            const Eigen::Vector3d & p2,
+            const int ndegree,
+            const int nsample,
             Eigen::MatrixXd & B,
             Eigen::MatrixXd & N);
 

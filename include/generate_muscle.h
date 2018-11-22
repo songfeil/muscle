@@ -10,6 +10,7 @@
 #include <set>
 
 void generate_muscle(const Eigen::MatrixXd & points,
+                     const int num_points,
                      const Eigen::MatrixXd & V,
                      const Eigen::MatrixXi & F,
                      const std::set<int> & selected_faces,

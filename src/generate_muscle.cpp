@@ -10,8 +10,10 @@
 #include "poisson_surface_reconstruction.h"
 #include "triangle_hunt.h"
 #include <igl/per_face_normals.h>
+#include <Eigen/Dense>
 
 void generate_muscle(const Eigen::MatrixXd & points,
+                     const int num_points,
                      const Eigen::MatrixXd & V,
                      const Eigen::MatrixXi & F,
                      const std::set<int> & selected_faces,
@@ -22,9 +24,12 @@ void generate_muscle(const Eigen::MatrixXd & points,
     Eigen::Vector3d p1 = points.row(points.rows() - 1);
     Eigen::Vector3d p2 = points.row(points.rows() - 2);
     Eigen::Vector3d p3 = points.row(points.rows() - 3);
+    Eigen::MatrixXd p  = points.block(points.rows() - num_points, 0, num_points, 3);
+    p.colwise().reverse();
     // Your code here to populate V and F
     Eigen::MatrixXd Bc, Nc, pV, pN;
-    bezier(p1, p2, p3, 50, Bc, Nc);
+//    bezier(p1, p2, p3, 50, Bc, Nc);
+    bezier(p, num_points-1, 50, Bc, Nc);
 //            bezier(Eigen::Vector3d(0, 0, 0), Eigen::Vector3d(0, 1, 2.5), Eigen::Vector3d(0, 0, 5), 10, Bc, Nc);
     volume_along_curve(Bc, Nc, pV, pN);
     Eigen::MatrixXd All(pV.rows(), 6);

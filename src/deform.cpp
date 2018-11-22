@@ -50,7 +50,12 @@ void deform(
     Eigen::VectorXi bb = Eigen::VectorXi(5);
     bb << 0, 4, 8, 12, 16;
     Eigen::MatrixXd Bc, N;
-    bezier(p0, p2, p1, 4, Bc, N);
+    Eigen::MatrixXd p(3, 3);
+    p.row(0) = p0;
+    p.row(1) = p1;
+    p.row(2) = p2;
+//    bezier(p0, p2, p1, 4, Bc, N);
+    bezier(p, 2, 4, Bc, N);
     igl::ARAPData data;
     igl::arap_precomputation(V, F, 3, bb, data);
     igl::arap_solve(Bc, data, V);

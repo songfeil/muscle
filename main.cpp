@@ -13,7 +13,7 @@
 #include "generate_bone.h"
 #include "generate_muscle.h"
 #include "ray_intersect_plane.h"
-#include "inflate_muscle.h"
+//#include "inflate_muscle.h"
 
 /* Input mode enum */
 enum Mode
@@ -159,7 +159,7 @@ int main(int argc, char *argv[])
 
           // For every 3 points, generate a muscle!
           if (n_points == 3) {
-            generate_muscle(control_points, V, F, selected_faces, VV, FF); 
+            generate_muscle(control_points, n_points, V, F, selected_faces, VV, FF);
             n_points = 0;
           }
         }
@@ -241,7 +241,7 @@ int main(int argc, char *argv[])
         Eigen::MatrixXd muscle_mesh = VV.back(); // Assuming muscle was last mesh added
         int start = V.rows() - muscle_mesh.rows();
         int end = V.rows();
-        inflate_muscle(V, F, start, end, Vnew);
+        //inflate_muscle(V, F, start, end, Vnew);
         VV.pop_back();
         VV.push_back(Vnew);
         std::cout << "INFLATE" << std::endl;
