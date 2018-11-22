@@ -3,11 +3,13 @@
 #include <igl/combine.h>
 #include <igl/unproject_onto_mesh.h>
 #include <igl/read_triangle_mesh.h>
+#include <igl/writeOBJ.h>
 
 #include <Eigen/Geometry>
 #include <Eigen/Sparse>
 
 #include <vector>
+#include <string>
 #include <iostream>
 
 #include "generate_bone.h"
@@ -245,6 +247,17 @@ int main(int argc, char *argv[])
         VV.pop_back();
         VV.push_back(Vnew);
         std::cout << "INFLATE" << std::endl;
+        break;
+      }
+      case 's':
+      {
+        Eigen::MatrixXd empty;
+        igl::writeOBJ("output_all.obj", V, F, empty, empty, empty, empty);
+        for (int i = 0; i < VV.size(); i++) {
+          std::string suffix = ".obj";
+          std::string filename = std::to_string(i) + suffix;
+          igl::writeOBJ(filename, VV[i], FF[i], empty, empty, empty, empty);
+        }
         break;
       }
     }
