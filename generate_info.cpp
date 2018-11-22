@@ -2,6 +2,7 @@
 #include <igl/signed_distance.h>
 #include <igl/readOBJ.h>
 #include <igl/readMSH.h>
+#include <igl/writeMESH.h>
 #include <vector>
 #include <iostream>
 
@@ -90,6 +91,16 @@ int main(int argc, char ** argv) {
   std::cout << "Bone 1 has " << result.bone1Idx.size() << " tets" << std::endl;
   std::cout << "Bone 2 has " << result.bone2Idx.size() << " tets" << std::endl;
   std::cout << "Muscle has " << result.muscleIdx.size() << " tets" << std::endl;
+
+//  // Test part, doesn't write any faces
+//  std::vector<int> target = result.muscleIdx;
+//  TMAT T_new;
+//  T_new.resize(target.size(), T_all.cols());
+//  for (int i = 0; i < target.size(); i++) {
+//    T_new.row(i) = T_all.row(target[i]);
+//  }
+//  igl::writeMESH("test.mesh", V_all, T_new, Eigen::MatrixXi());
+
 
   return 0;
 }
