@@ -21,9 +21,6 @@ void generate_muscle(const Eigen::MatrixXd & points,
                      std::vector<Eigen::MatrixXi> & FF) {
     Eigen::MatrixXd Vm;
     Eigen::MatrixXi Fm;
-    Eigen::Vector3d p1 = points.row(points.rows() - 1);
-    Eigen::Vector3d p2 = points.row(points.rows() - 2);
-    Eigen::Vector3d p3 = points.row(points.rows() - 3);
     Eigen::MatrixXd p  = points.block(points.rows() - num_points, 0, num_points, 3);
     p.colwise().reverse();
     // Your code here to populate V and F

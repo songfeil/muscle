@@ -147,8 +147,6 @@ int main(int argc, char *argv[])
             VV.push_back(Vnew);
             n_points = 0;
           }
-          control_points.conservativeResize(control_points.rows() + 1, 3);
-          control_points.row(control_points.rows() - 1) = intersection;
 
         }
 
@@ -159,11 +157,6 @@ int main(int argc, char *argv[])
           control_points.row(control_points.rows() - 1) = intersection;
           n_points++;
 
-          // For every 3 points, generate a muscle!
-          if (n_points == 3) {
-            generate_muscle(control_points, n_points, V, F, selected_faces, VV, FF);
-            n_points = 0;
-          }
         }
       }
 
@@ -231,8 +224,10 @@ int main(int argc, char *argv[])
       case 'G':
       case 'g':
       {
-        if ( mode == BONE) {
-          generate_bones(control_points, VV, FF);
+        if ( mode == MUSCLE) {
+          generate_muscle(control_points, n_points, V, F, selected_faces, VV, FF);
+          control_points.resize(0, 3);
+          n_points = 0;
         }
         break;
       }

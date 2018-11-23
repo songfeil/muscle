@@ -25,9 +25,6 @@ void bezier(const Eigen::MatrixXd & p,
             const int nsample,
             Eigen::MatrixXd & B,
             Eigen::MatrixXd & N) {
-    Eigen::Vector3d p0 = p.row(0);
-    Eigen::Vector3d p1 = p.row(1);
-    Eigen::Vector3d p2 = p.row(2);
     Eigen::VectorXd bezier_coeff(ndegree + 1);
     for (int i = 0; i <= ndegree; i++) {
         std::cout << n_choose_k(ndegree, i) <<" "<<std::endl;
