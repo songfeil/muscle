@@ -33,9 +33,9 @@ void generate_muscle(const Eigen::MatrixXd & points,
     All << pV, pN;
     poisson_surface_reconstruction(pV, pN, Vm, Fm);
 
-    Eigen::VectorXi bb = Eigen::VectorXi(6);
-    Eigen::MatrixXd Bonedest(6, 3);
-    Eigen::MatrixXd musclef(6, 3);
+    Eigen::VectorXi bb = Eigen::VectorXi(selected_faces.size()*3);
+    Eigen::MatrixXd Bonedest(selected_faces.size()*3, 3);
+    Eigen::MatrixXd musclef(selected_faces.size()*3, 3);
 
     for (auto it = selected_faces.begin(); it != selected_faces.end(); ++it) {
         int curr = std::distance(selected_faces.begin(), it);
@@ -49,7 +49,6 @@ void generate_muscle(const Eigen::MatrixXd & points,
         std::cout<<P<<std::endl;
         int fi = triangle_hunts(P, Vm, Fm);
         Eigen::RowVector3i f = Fm.row(fi);
-
         Bonedest.row(3*curr) = P.row(2);
         Bonedest.row(3*curr+1) = P.row(1);
         Bonedest.row(3*curr+2) = P.row(0);
