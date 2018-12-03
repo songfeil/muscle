@@ -11,6 +11,7 @@
 #include <vector>
 #include <string>
 #include <iostream>
+#include <stack>
 
 #include "generate_bone.h"
 #include "generate_muscle.h"
@@ -34,24 +35,36 @@ const Eigen::RowVector3d green(0.2,0.6,0.3);
 
 /* GLOBAL STATE :-) */
 
-// Mesh
-std::vector<Eigen::MatrixXd> VV;
-std::vector<Eigen::MatrixXi> FF;
-Eigen::MatrixXd V;
-Eigen::MatrixXi F;
-Eigen::MatrixXd face_colors;
-std::set<int> selected_faces;
+// Undoable
+struct State
+{
+  int id = 0;
+  // Lists of meshes
+  std::vector<Eigen::MatrixXd> VV; 
+  std::vector<Eigen::MatrixXi> FF;
+  // Total combination of all meshes to be displayed
+  Eigen::MatrixXd V;
+  Eigen::MatrixXi F;
+  // Colored faces
+  Eigen::MatrixXd face_colors;
+  std::set<int> selected_faces;
+  // Muscle control points
+  Eigen::MatrixXd control_points;
+  int n_points = 0;
+  // Bone start point
+  Eigen::Vector3d bp0;
+} s;
 
-// Interface
+// Non-undoable state
 Mode mode = NONE;
 Eigen::Vector3d last_mouse;
-Eigen::MatrixXd control_points;
-int n_points = 0;
+bool bone_started = false;
 bool mouse_down = false;
+int hover_point_index = -1;
 
+// Bone mesh template
 Eigen::MatrixXd Vbone;
 Eigen::MatrixXi Fbone;
-Eigen::Vector3d bp0;
 
 void intersection_with_xy_plane(const igl::opengl::glfw::Viewer & viewer, Eigen::Vector3d & intersection) {
   Eigen::Vector3d source, dir;
@@ -64,6 +77,33 @@ void intersection_with_xy_plane(const igl::opengl::glfw::Viewer & viewer, Eigen:
 int main(int argc, char *argv[])
 {
 
+  // Undo Management
+  std::stack<State> undo_stack,redo_stack;
+  const auto push_undo = [&](State & _s=s)
+  {
+    undo_stack.push(_s);
+    // clear
+    redo_stack = std::stack<State>();
+  };
+  const auto undo = [&]()
+  {
+    if(!undo_stack.empty())
+    {
+      redo_stack.push(s);
+      s = undo_stack.top();
+      undo_stack.pop();
+    }
+  };
+  const auto redo = [&]()
+  {
+    if(!redo_stack.empty())
+    {
+      undo_stack.push(s);
+      s = redo_stack.top();
+      redo_stack.pop();
+    }
+  };
+
   /* Instantiate libigl Viewer */
   igl::opengl::glfw::Viewer viewer;
   std::cout << "========= MUSCLE/BONE GENERATION =========" << std::endl;
@@ -75,35 +115,29 @@ int main(int argc, char *argv[])
   /* Define update functions for viewer */
   const auto & update = [&]()
   {
-
-    /* If FACE_SELECT, only update colours */
-    if (mode == FACE_SELECT) {
-      viewer.data().set_colors(face_colors);
-    }
-
-    /* If BONE or MUSCLE generated, create a new combination of meshes */
-    // Setting multiple meshes
-    // http://www.alecjacobson.com/weblog/?p=4679
-    else {
       
-      viewer.data().clear();
-      viewer.data().set_points(control_points, mode == BONE? orange : blue);
+    viewer.data().clear();
+    viewer.data().set_points(s.control_points, orange);
 
-      if (VV.size() > 0) {
+    if (s.VV.size() > 0) {
+      
+      // New mesh!
+      igl::combine(s.VV,s.FF,s.V,s.F);
+      viewer.data().set_mesh(s.V,s.F);
 
-        // New mesh!
-        igl::combine(VV,FF,V,F);
-        viewer.data().set_mesh(V,F);
-
-        // Reset colors
-        face_colors.resize(F.rows(), 3);
-        for (int i = 0; i < F.rows(); i++) {
-          face_colors.row(i) = green;
-        }
-
-        viewer.data().set_colors(face_colors);
+      // Reset colors
+      s.face_colors.resize(s.F.rows(), 3);
+      for (int i = 0; i < s.F.rows(); i++) {
+        s.face_colors.row(i) = green;
       }
+
+      for (const auto & index : s.selected_faces) {
+        s.face_colors.row(index) = orange;
+      }
+
+      viewer.data().set_colors(s.face_colors);
     }
+
   };
 
   /* Mouse down */
@@ -124,10 +158,13 @@ int main(int argc, char *argv[])
         Eigen::RowVector2f mouse;
         mouse << last_mouse.head(2)(0), last_mouse.head(2)(1);
 
-        if (igl::unproject_onto_mesh(mouse, viewer.core.view, viewer.core.proj, viewer.core.viewport, V, F, fid, bary)) {
-          selected_faces.insert(fid);
-          face_colors.row(fid) = orange;
+        if (igl::unproject_onto_mesh(mouse, viewer.core.view, viewer.core.proj, viewer.core.viewport, s.V, s.F, fid, bary)) {
+
+          push_undo(s);
+
+          s.selected_faces.insert(fid);
         }
+
       }
 
       /* Point input modes */
@@ -139,21 +176,26 @@ int main(int argc, char *argv[])
         if (mode == BONE) {
           
           // Start of bone
-          if (n_points == 0) {
+          if (!bone_started) {
+
+            push_undo(s);
+            
             Eigen::MatrixXd Vnew = Vbone.replicate(1, 1);
             start_flinstone_bone(intersection, Vnew);
-            VV.push_back(Vnew);
-            FF.push_back(Fbone);
-            bp0 = intersection;
-            n_points++;
+            s.VV.push_back(Vnew);
+            s.FF.push_back(Fbone);
+            s.bp0 = intersection;
+            bone_started = true;
           } 
           // End of bone
-          else if (n_points == 1) {
+          else {
+
             Eigen::MatrixXd Vnew = Vbone.replicate(1, 1);
-            transform_flinstone_bone(bp0, intersection, Vnew);
-            VV.pop_back();
-            VV.push_back(Vnew);
-            n_points = 0;
+            transform_flinstone_bone(s.bp0, intersection, Vnew);
+            s.VV.pop_back();
+            s.VV.push_back(Vnew);
+            bone_started = false;
+
           }
 
         }
@@ -161,9 +203,11 @@ int main(int argc, char *argv[])
         /* MUSCLE */
         else if (mode == MUSCLE) {
 
-          control_points.conservativeResize(control_points.rows() + 1, 3);
-          control_points.row(control_points.rows() - 1) = intersection;
-          n_points++;
+          push_undo(s);
+
+          s.control_points.conservativeResize(s.control_points.rows() + 1, 3);
+          s.control_points.row(s.control_points.rows() - 1) = intersection;
+          s.n_points++;
 
         }
       }
@@ -181,32 +225,52 @@ int main(int argc, char *argv[])
     [&](igl::opengl::glfw::Viewer&, int, int)->bool
   {
     last_mouse = Eigen::Vector3d(viewer.current_mouse_x,viewer.core.viewport(3)-viewer.current_mouse_y,0);
+    
     // Wiggle around bone after one point has been put down!
-    if ((mode == BONE) && (n_points == 1)) {
+    if ((mode == BONE) && (bone_started)) {
       
       Eigen::Vector3d intersection;
       intersection_with_xy_plane(viewer, intersection);
 
       Eigen::MatrixXd Vnew = Vbone.replicate(1, 1);
-      transform_flinstone_bone(bp0, intersection, Vnew);
-      VV.pop_back();
-      VV.push_back(Vnew);
+      transform_flinstone_bone(s.bp0, intersection, Vnew);
+      s.VV.pop_back();
+      s.VV.push_back(Vnew);
 
       update();
       return true;
     }
-    // Continuous "sketching" input for muscle points
-    else if (mouse_down && (mode == MUSCLE)) {
-      
+  
+    else if (mode == MUSCLE) {
+
       Eigen::Vector3d intersection;
       intersection_with_xy_plane(viewer, intersection);
 
-      control_points.conservativeResize(control_points.rows() + 1, 3);
-      control_points.row(control_points.rows() - 1) = intersection;
-      n_points++;
+      // Continuous "sketching" input for muscle points
+      if (mouse_down) {
 
-      update();
-      return true;
+        push_undo(s);
+
+        s.control_points.conservativeResize(s.control_points.rows() + 1, 3);
+        s.control_points.row(s.control_points.rows() - 1) = intersection;
+        s.n_points++;
+
+        update();
+        return true;
+      }
+
+      // // Hover existing point + click to delete
+      // else {
+
+      //   for (int i = 0; i < s.control_points.rows(); i++) {
+      //     auto p = s.control_points.row(i);
+      //     if ((intersection - p).norm() < viewer.data().point_size) {
+
+      //     }
+      //   }
+
+      // }
+      
     }
     return false;
   };
@@ -228,18 +292,19 @@ int main(int argc, char *argv[])
       case 'b':
       {
         // Bone input mode
-         mode = BONE;
-         control_points.resize(0, 3);
-         n_points = 0;
+        mode = BONE;
         break;
       }
       case 'M':
       case 'm':
       {
         // Muscle input mode
-         mode = MUSCLE;
-         control_points.resize(0, 3);
-         n_points = 0;
+        if (mode == MUSCLE) { // click M again to clear? lol
+          s.control_points.resize(0, 3);
+          s.n_points = 0;
+        } else {
+          mode = MUSCLE;
+        }
         break;
       }
       case ' ':
@@ -258,10 +323,10 @@ int main(int argc, char *argv[])
       case 'g':
       {
         // Generate muscle from points
-        if ( mode == MUSCLE) {
-          generate_muscle(control_points, n_points, V, F, selected_faces, VV, FF);
-          control_points.resize(0, 3);
-          n_points = 0;
+        if (s.n_points > 2) { // Need some points to work with...
+          generate_muscle(s.control_points, s.n_points, s.V, s.F, s.selected_faces, s.VV, s.FF);
+          s.control_points.resize(0, 3);
+          s.n_points = 0;
         }
         break;
       }
@@ -270,29 +335,43 @@ int main(int argc, char *argv[])
         // // Inflate muscle mesh
         // Eigen::MatrixXd Vnew;
         // Eigen::MatrixXi Fnew;
-        // Eigen::MatrixXd muscle_mesh = VV.back(); // Assuming muscle was last mesh added
-        // int start = V.rows() - muscle_mesh.rows();
-        // int end = V.rows();
-        // inflate_muscle(V, F, start, end, Vnew);
-        // VV.pop_back();
-        // VV.push_back(Vnew);
+        // Eigen::MatrixXd muscle_mesh = s.VV.back(); // Assuming muscle was last mesh added
+        // int start = s.V.rows() - muscle_mesh.rows();
+        // int end = s.V.rows();
+        // inflate_muscle(s.V, s.F, start, end, Vnew);
+        // s.VV.pop_back();
+        // s.VV.push_back(Vnew);
         // std::cout << "INFLATE" << std::endl;
         // break;
       }
       case 's':
       {
         Eigen::MatrixXd empty;
-        igl::writeOBJ("output_all.obj", V, F, empty, empty, empty, empty);
-        for (int i = 0; i < VV.size(); i++) {
+        igl::writeOBJ("output_all.obj", s.V, s.F, empty, empty, empty, empty);
+        for (int i = 0; i < s.VV.size(); i++) {
           std::string suffix = ".obj";
           std::string filename = std::to_string(i) + suffix;
-          igl::writeOBJ(filename, VV[i], FF[i], empty, empty, empty, empty);
+          igl::writeOBJ(filename, s.VV[i], s.FF[i], empty, empty, empty, empty);
         }
         break;
       }
     }
     update();
     return true;
+  };
+
+  // Special callback for handling undo
+  viewer.callback_key_down = 
+    [&](igl::opengl::glfw::Viewer &, unsigned char key, int mod)->bool
+  {
+    if(key == 'Z' && (mod & GLFW_MOD_SUPER))
+    {
+      std::cout << "undo/redo?" << std::endl;
+      (mod & GLFW_MOD_SHIFT) ? redo() : undo();
+      update();
+      return true;
+    }
+    return false;
   };
 
   // Launch a viewer instance
