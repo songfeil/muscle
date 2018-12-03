@@ -225,7 +225,8 @@ int main(int argc, char *argv[])
       case 'g':
       {
         if ( mode == MUSCLE) {
-          generate_muscle(control_points, n_points, V, F, selected_faces, VV, FF);
+//          generate_muscle(control_points, n_points, V, F, selected_faces, VV, FF);
+          generate_muscle_multiface(control_points, n_points, V, F, selected_faces, selected_faces, VV, FF);
           control_points.resize(0, 3);
           n_points = 0;
         }

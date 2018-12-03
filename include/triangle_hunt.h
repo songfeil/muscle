@@ -11,5 +11,6 @@
 
 void triangle_hunt(Eigen::Matrix3d & P, Eigen::MatrixXd & V, Eigen::MatrixXi & F);
 int triangle_hunts(Eigen::Matrix3d & P, Eigen::MatrixXd V, Eigen::MatrixXi F);
+void triangle_hunt_lst(Eigen::RowVector3d & P, Eigen::MatrixXd & V, Eigen::MatrixXi & F, Eigen::MatrixXd & lst_dist);
 
 #endif //INTRODUCTION_TRIANGLE_HUNT_H

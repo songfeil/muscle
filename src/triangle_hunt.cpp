@@ -43,6 +43,8 @@ void triangle_hunt(Eigen::Matrix3d & P, Eigen::MatrixXd & V, Eigen::MatrixXi & F
 
 int triangle_hunts(Eigen::Matrix3d & P, Eigen::MatrixXd V, Eigen::MatrixXi F) {
     Eigen::RowVector3d triangleCenter = (P.row(0) + P.row(1) + P.row(2)) / 3.0;
+    std::cout << "triangle center" << std::endl;
+    std::cout << triangleCenter << std::endl;
     double dist = std::numeric_limits<double>::infinity();
     int fi = -1;
     Eigen::RowVector3d sp0 = P.row(2);
@@ -79,4 +81,26 @@ int triangle_hunts(Eigen::Matrix3d & P, Eigen::MatrixXd V, Eigen::MatrixXi F) {
     // Change the location
     Eigen::RowVector3i f = F.row(fi);
     return fi;
+}
+
+
+void triangle_hunt_lst(Eigen::RowVector3d & P, Eigen::MatrixXd & V, Eigen::MatrixXi & F, Eigen::MatrixXd & lst_dist) {
+    // Record the distance from the center of each triangle on muscle to center point P of the selected faces on bone
+    double dist = std::numeric_limits<double>::infinity();
+    int fi = -1;
+    for (int i = 0; i < F.rows(); i++) {
+        Eigen::RowVector3i f = F.row(i);
+        Eigen::RowVector3d p0 = V.row(f(0));
+        Eigen::RowVector3d p1 = V.row(f(1));
+        Eigen::RowVector3d p2 = V.row(f(2));
+
+        Eigen::RowVector3d pc = (p0 + p1 + p2) / 3.0;
+
+        double cdist = abs((pc - P).norm());
+        lst_dist(i, 0) = cdist;
+        if (cdist < dist) {
+            dist = cdist;
+            fi = i;
+        }
+    }
 }
