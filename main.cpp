@@ -1,9 +1,9 @@
 #include <igl/opengl/glfw/Viewer.h>
-#include <igl/unproject_ray.h>
 #include <igl/combine.h>
 #include <igl/unproject_onto_mesh.h>
 #include <igl/read_triangle_mesh.h>
 #include <igl/writeOBJ.h>
+#include <igl/adjacency_matrix.h>
 
 #include <Eigen/Geometry>
 #include <Eigen/Sparse>
@@ -13,9 +13,9 @@
 #include <iostream>
 #include <stack>
 
+#include "ui_helpers.h"
 #include "generate_bone.h"
 #include "generate_muscle.h"
-#include "ray_intersect_plane.h"
 //#include "inflate_muscle.h"
 
 /* Input mode enum */
@@ -28,10 +28,11 @@ enum Mode
 };
 
 /* Color consts */
-const Eigen::RowVector3d orange(1.0,0.7,0.2);
+const Eigen::RowVector3d red(1.0,0.0,0.2);
 const Eigen::RowVector3d yellow(1.0,0.9,0.2);
 const Eigen::RowVector3d blue(0.2,0.3,0.8);
 const Eigen::RowVector3d green(0.2,0.6,0.3);
+Eigen::RowVector3d patch_colors[3] = {yellow, red, blue};
 
 /* GLOBAL STATE :-) */
 
@@ -45,9 +46,10 @@ struct State
   // Total combination of all meshes to be displayed
   Eigen::MatrixXd V;
   Eigen::MatrixXi F;
-  // Colored faces
+  // Selected faces
   Eigen::MatrixXd face_colors;
-  std::set<int> selected_faces;
+  std::vector<std::vector<int>> patch_fids; // for coloring
+  std::vector<Eigen::MatrixXi> patch_faces;
   // Muscle control points
   Eigen::MatrixXd control_points;
   int n_points = 0;
@@ -65,14 +67,6 @@ int hover_point_index = -1;
 // Bone mesh template
 Eigen::MatrixXd Vbone;
 Eigen::MatrixXi Fbone;
-
-void intersection_with_xy_plane(const igl::opengl::glfw::Viewer & viewer, Eigen::Vector3d & intersection) {
-  Eigen::Vector3d source, dir;
-  Eigen::Vector2d p;
-  p << last_mouse.head(2)(0), last_mouse.head(2)(1);
-  igl::unproject_ray(p, viewer.core.view, viewer.core.proj, viewer.core.viewport, source, dir);
-  ray_intersect_plane(Eigen::Vector3d(0, 0, 0), Eigen::Vector3d(0, 0, 1), source, dir, intersection);
-}
 
 int main(int argc, char *argv[])
 {
@@ -113,26 +107,34 @@ int main(int argc, char *argv[])
   igl::read_triangle_mesh("../data/bone.obj",Vbone,Fbone);
   
   /* Define update functions for viewer */
-  const auto & update = [&]()
+  const auto & update = [&](bool update_mesh)
   {
       
     viewer.data().clear();
-    viewer.data().set_points(s.control_points, orange);
+    viewer.data().set_points(s.control_points, yellow);
 
     if (s.VV.size() > 0) {
       
       // New mesh!
-      igl::combine(s.VV,s.FF,s.V,s.F);
-      viewer.data().set_mesh(s.V,s.F);
-
+      if (update_mesh) {
+        igl::combine(s.VV,s.FF,s.V,s.F);
+        viewer.data().set_mesh(s.V,s.F);
+      }
+      
       // Reset colors
       s.face_colors.resize(s.F.rows(), 3);
       for (int i = 0; i < s.F.rows(); i++) {
         s.face_colors.row(i) = green;
       }
 
-      for (const auto & index : s.selected_faces) {
-        s.face_colors.row(index) = orange;
+      // Color each patch differently
+      int patch_num = 0;
+      for (const auto & patch : s.patch_fids) {
+        int color = patch_num % 3;
+        for (int fid : patch) {
+          s.face_colors.row(fid) = patch_colors[color];
+        }
+        patch_num++;
       }
 
       viewer.data().set_colors(s.face_colors);
@@ -161,8 +163,10 @@ int main(int argc, char *argv[])
         if (igl::unproject_onto_mesh(mouse, viewer.core.view, viewer.core.proj, viewer.core.viewport, s.V, s.F, fid, bary)) {
 
           push_undo(s);
-
-          s.selected_faces.insert(fid);
+          add_face_to_patch(fid, s.F.row(fid), s.patch_faces, s.patch_fids);
+          update(true);
+          return true;
+          
         }
 
       }
@@ -170,7 +174,7 @@ int main(int argc, char *argv[])
       /* Point input modes */
       else {
         Eigen::Vector3d intersection;
-        intersection_with_xy_plane(viewer, intersection);
+        intersection_with_xy_plane(viewer, last_mouse, intersection);
 
         /* BONE */
         if (mode == BONE) {
@@ -198,6 +202,8 @@ int main(int argc, char *argv[])
 
           }
 
+          update(true);
+
         }
 
         /* MUSCLE */
@@ -209,11 +215,11 @@ int main(int argc, char *argv[])
           s.control_points.row(s.control_points.rows() - 1) = intersection;
           s.n_points++;
 
+          update(true);
+
         }
       }
-
-        update();
-        return true;
+      return true;
 
     }
 
@@ -230,21 +236,21 @@ int main(int argc, char *argv[])
     if ((mode == BONE) && (bone_started)) {
       
       Eigen::Vector3d intersection;
-      intersection_with_xy_plane(viewer, intersection);
+      intersection_with_xy_plane(viewer, last_mouse, intersection);
 
       Eigen::MatrixXd Vnew = Vbone.replicate(1, 1);
       transform_flinstone_bone(s.bp0, intersection, Vnew);
       s.VV.pop_back();
       s.VV.push_back(Vnew);
 
-      update();
+      update(true);
       return true;
     }
   
     else if (mode == MUSCLE) {
 
       Eigen::Vector3d intersection;
-      intersection_with_xy_plane(viewer, intersection);
+      intersection_with_xy_plane(viewer, last_mouse, intersection);
 
       // Continuous "sketching" input for muscle points
       if (mouse_down) {
@@ -255,7 +261,7 @@ int main(int argc, char *argv[])
         s.control_points.row(s.control_points.rows() - 1) = intersection;
         s.n_points++;
 
-        update();
+        update(true);
         return true;
       }
 
@@ -302,6 +308,7 @@ int main(int argc, char *argv[])
         if (mode == MUSCLE) { // click M again to clear? lol
           s.control_points.resize(0, 3);
           s.n_points = 0;
+          update(true);
         } else {
           mode = MUSCLE;
         }
@@ -324,9 +331,19 @@ int main(int argc, char *argv[])
       {
         // Generate muscle from points
         if (s.n_points > 2) { // Need some points to work with...
-          generate_muscle(s.control_points, s.n_points, s.V, s.F, s.selected_faces, s.VV, s.FF);
+          // NO LONGER HAVE S.SELECTED_FACES...
+          // Just picking a face from each patch......
+          // Temporary!
+          std::set<int> face_per_patch; 
+          for (const auto & patch : s.patch_fids) {
+            face_per_patch.insert(patch.at(0));
+          }
+          generate_muscle(s.control_points, s.n_points, s.V, s.F, face_per_patch, s.VV, s.FF);
+          //generate_muscle_multiface(s.control_points, s.n_points, s.V, s.F, face_per_patch, face_per_patch, s.VV, s.FF);
           s.control_points.resize(0, 3);
           s.n_points = 0;
+
+          update(true);
         }
         break;
       }
@@ -356,7 +373,6 @@ int main(int argc, char *argv[])
         break;
       }
     }
-    update();
     return true;
   };
 
@@ -368,7 +384,7 @@ int main(int argc, char *argv[])
     {
       std::cout << "undo/redo?" << std::endl;
       (mod & GLFW_MOD_SHIFT) ? redo() : undo();
-      update();
+      update(true);
       return true;
     }
     return false;
