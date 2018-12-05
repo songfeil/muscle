@@ -90,8 +90,12 @@ void map_move_patch(
         bonBND_U.row(i) = bonU.row(bonBND(i));
     }
 
-    Eigen::VectorXi musBND;
-    igl::boundary_loop(musF, musBND);
+    Eigen::VectorXi musBND_orig, musBND;
+    igl::boundary_loop(musF, musBND_orig);
+    musBND.resize(musBND_orig.size());
+    for (int i = 0; i < musBND_orig.rows(); i++) {
+        musBND(i) = musBND_orig(musBND_orig.rows()-1-i);
+    }
     Eigen::MatrixXd mus_uv;
     igl::map_vertices_to_circle(musV, musBND, mus_uv);
     Eigen::MatrixXd musU, musBND_U;
