@@ -17,13 +17,14 @@
 #include <igl/doublearea.h>
 #include <igl/sort.h>
 #include <set>
+#include <vector>
 #include <move_patch.h>
 
 void generate_muscle(const Eigen::MatrixXd & points,
                      const int num_points,
                      const Eigen::MatrixXd & V,
                      const Eigen::MatrixXi & F,
-                     const std::set<int> & selected_faces,
+                     const std::vector<Eigen::MatrixXi> & selected_faces,
                      std::vector<Eigen::MatrixXd> & VV,
                      std::vector<Eigen::MatrixXi> & FF) {
     Eigen::MatrixXd Vm;
@@ -45,9 +46,10 @@ void generate_muscle(const Eigen::MatrixXd & points,
     Eigen::MatrixXd Bonedest(selected_faces.size()*3, 3);
     Eigen::MatrixXd musclef(selected_faces.size()*3, 3);
 
+
     for (auto it = selected_faces.begin(); it != selected_faces.end(); ++it) {
         int curr = std::distance(selected_faces.begin(), it);
-        Eigen::RowVectorXi triangle = F.row(*it);
+        Eigen::RowVectorXi triangle = (*it).row(0);
         std::cout<<triangle<<std::endl;
         Eigen::Matrix3d P = Eigen::Matrix3d::Zero();
         P.row(0) = V.row(triangle(0));
@@ -119,8 +121,7 @@ void generate_muscle_multiface(const Eigen::MatrixXd & points,
                                const int num_points,
                                const Eigen::MatrixXd & V,
                                const Eigen::MatrixXi & F,
-                               const std::set<int> & selected_faces1,
-                               const std::set<int> & selected_faces2,
+                               const std::vector<Eigen::MatrixXi> & selected_faces,
                                std::vector<Eigen::MatrixXd> & VV,
                                std::vector<Eigen::MatrixXi> & FF) {
     Eigen::MatrixXd Vm;
@@ -139,67 +140,6 @@ void generate_muscle_multiface(const Eigen::MatrixXd & points,
     poisson_surface_reconstruction(pV, pN, Vm, Fm);
 
 
-
-
-
-    // Calculate area and center of attachment site 1 on bone
-    // Also get the total number of distinct vertices in order
-    // to construct a small mesh for the patch on bone.
-    double area1 = 0; double num1 = 0;
-    Eigen::MatrixXi Fpatch1(1, 3);
-    int Vidx[3*selected_faces1.size()];
-    std::set<int> s1;
-    int numdistinct = 0;
-    Eigen::RowVector3d center1 = Eigen::RowVector3d::Zero();
-
-    for (auto it = selected_faces1.begin(); it != selected_faces1.end(); ++it) {
-        // currently only one face is selected in face 1
-        ++it;
-        if (it == selected_faces1.end()) {
-            break;
-        }
-        --it;
-        // delete the above portion when selected_faces1 and selected_faces2 are correctly implemented
-
-        num1 += 1;
-        int curr = std::distance(selected_faces1.begin(), it);
-        Eigen::RowVectorXi triangle = F.row(*it);
-        Eigen::RowVector3d triangleCenter = (V.row(triangle(0)) + V.row(triangle(1)) + V.row(triangle(2))) / 3.0;
-        center1 += triangleCenter;
-
-        double a = (V.row(triangle(0)) - V.row(triangle(1))).norm();
-        double b = (V.row(triangle(1)) - V.row(triangle(2))).norm();
-        double c = (V.row(triangle(2)) - V.row(triangle(0))).norm();
-        double s = (a+b+c) / 2.;
-        area1 += pow(s*(s-a)*(s-b)*(s-c), 0.5);
-
-        // Construct smaller mesh for the patch on bone
-        for (int j = 0; j < 3; j++) {
-            int fj = triangle(j);
-            auto result = s1.insert(fj);
-            if ( result.second ) {
-                Vidx[numdistinct] = fj;
-                Fpatch1(curr, j) = numdistinct;
-                numdistinct++;
-            } else {
-                for (int k = 0; k < numdistinct; k++) {
-                    if (Vidx[k] == fj) {
-                        Fpatch1(curr, j) = k;
-                    }
-                }
-            }
-        }
-
-    }
-    center1 = 1./num1 * center1;
-    Eigen::MatrixXd Vpatch1(numdistinct, 3);
-    for (int i = 0; i < numdistinct; i++) {
-        Vpatch1.row(i) = V.row(Vidx[i]);
-    }
-
-    std::cout << "num1 " << num1 <<std::endl;
-    std::cout << "center1 " << center1 <<std::endl;
-
     // Calculate average surface area of muscle mesh
     Eigen::MatrixXd dblA;
     igl::doublearea(Vm, Fm, dblA);
@@ -209,102 +149,295 @@ void generate_muscle_multiface(const Eigen::MatrixXd & points,
     }
     double avg_area = muscle_totalarea / dblA.rows();
 
-    // Determine the total number of faces on the muscle to be deformed towards bone
-    int sourcenum1 = ceil(area1 / avg_area);
-//    sourcenum1 = 100;
-    std::cout << "sourcenum1 " << sourcenum1 << std::endl;
-    Eigen::MatrixXd lst_dist(Fm.rows(), 1);
-    triangle_hunt_lst(center1, Vm, Fm, lst_dist);
-    Eigen::MatrixXd sY, sIX;
-    igl::sort(lst_dist, 1, true, sY, sIX);
 
-    Eigen::MatrixXd closest1 = sIX.block(0, 0, sourcenum1, 1);
-    Eigen::MatrixXi Fmpatch1(closest1.rows(), 3);
-    int Vmidx[3*closest1.rows()];
-    numdistinct = 0;
+    // Calculate area and center of attachment site 1 on bone
+    // Also get the total number of distinct vertices in order
+    // to construct a small mesh for the patch on bone.
+    for (auto it = selected_faces.begin(); it != selected_faces.end(); ++it) {
+        Eigen::MatrixXi curr_patch = *it;
+        double area1 = 0; double num1 = 0;
+        Eigen::MatrixXi Fpatch1(curr_patch.rows(), 3);
+        int Vidx[3*curr_patch.rows()];
+        std::set<int> s1;
+        int numdistinct = 0;
+        Eigen::RowVector3d center1 = Eigen::RowVector3d::Zero();
+        int curr = std::distance(selected_faces.begin(), it);
+        if (curr == 1) {
+            break;
+        }
+        for (int i = 0; i < curr_patch.rows(); i++) {
+            num1 += 1;
+            Eigen::RowVectorXi triangle = curr_patch.row(i);
+            Eigen::RowVector3d triangleCenter = (V.row(triangle(0)) + V.row(triangle(1)) + V.row(triangle(2))) / 3.0;
+            center1 += triangleCenter;
 
-    // Get the total number of distinct vertices
-    std::set<int> sm1;
-    for (int i = 0; i < closest1.rows(); i++) {
-        for (int j = 0; j < 3; j++) {
-            int fj = Fm(closest1(i), j);
-            auto result = sm1.insert(fj);
-            if ( result.second ) {
-                Vmidx[numdistinct] = fj;
-                Fmpatch1(i, j) = numdistinct;
-                numdistinct++;
-            } else {
-                for (int k = 0; k < numdistinct; k++) {
-                    if (Vmidx[k] == fj) {
-                        Fmpatch1(i, j) = k;
+            double a = (V.row(triangle(0)) - V.row(triangle(1))).norm();
+            double b = (V.row(triangle(1)) - V.row(triangle(2))).norm();
+            double c = (V.row(triangle(2)) - V.row(triangle(0))).norm();
+            double s = (a+b+c) / 2.;
+            area1 += pow(s*(s-a)*(s-b)*(s-c), 0.5);
+
+            // Construct smaller mesh for the patch on bone
+            for (int j = 0; j < 3; j++) {
+                int fj = triangle(j);
+                auto result = s1.insert(fj);
+                if ( result.second ) {
+                    Vidx[numdistinct] = fj;
+                    Fpatch1(i, j) = numdistinct;
+                    numdistinct++;
+                } else {
+                    for (int k = 0; k < numdistinct; k++) {
+                        if (Vidx[k] == fj) {
+                            Fpatch1(i, j) = k;
+                        }
+                    }
+                }
+            }
+
+        }
+        center1 = 1./num1 * center1;
+        Eigen::MatrixXd Vpatch1(numdistinct, 3);
+        for (int i = 0; i < numdistinct; i++) {
+            Vpatch1.row(i) = V.row(Vidx[i]);
+        }
+
+        std::cout << "loop num1 " << num1 <<std::endl;
+        std::cout << "loop center1 " << center1 <<std::endl;
+
+
+        // Determine the total number of faces on the muscle to be deformed towards bone
+        int sourcenum1 = ceil(area1 / avg_area);
+        std::cout << "loop sourcenum1 " << sourcenum1 << std::endl;
+        Eigen::MatrixXd lst_dist(Fm.rows(), 1);
+        triangle_hunt_lst(center1, Vm, Fm, lst_dist);
+        Eigen::MatrixXd sY, sIX;
+        igl::sort(lst_dist, 1, true, sY, sIX);
+
+        Eigen::MatrixXd closest1 = sIX.block(0, 0, sourcenum1, 1);
+        Eigen::MatrixXi Fmpatch1(closest1.rows(), 3);
+        int Vmidx[3*closest1.rows()];
+        numdistinct = 0;
+
+        // Get the total number of distinct vertices
+        std::set<int> sm1;
+        for (int i = 0; i < closest1.rows(); i++) {
+            for (int j = 0; j < 3; j++) {
+                int fj = Fm(closest1(i), j);
+                auto result = sm1.insert(fj);
+                if ( result.second ) {
+                    Vmidx[numdistinct] = fj;
+                    Fmpatch1(i, j) = numdistinct;
+                    numdistinct++;
+                } else {
+                    for (int k = 0; k < numdistinct; k++) {
+                        if (Vmidx[k] == fj) {
+                            Fmpatch1(i, j) = k;
+                        }
                     }
                 }
             }
         }
-    }
-    std::cout << "loop " << std::endl;
-    Eigen::MatrixXd Vmpatch1(numdistinct, 3);
-    for (int i = 0; i < numdistinct; i++) {
-        Vmpatch1.row(i) = Vm.row(Vmidx[i]);
-    }
-    std::cout << "loop2 " << std::endl;
+        Eigen::MatrixXd Vmpatch1(numdistinct, 3);
+        for (int i = 0; i < numdistinct; i++) {
+            Vmpatch1.row(i) = Vm.row(Vmidx[i]);
+        }
 
-//    for (int i = 0; i < closest1.rows(); i++) {
-//        Fpatch1.row(i) = Fm.row(closest1(i));
+
+        Eigen::MatrixXd musVNew;
+        map_move_patch(Vmpatch1, Fmpatch1, Vpatch1, Fpatch1, musVNew);
+
+        Eigen::VectorXi bnd;
+        igl::boundary_loop(Fmpatch1,bnd);
+
+        Eigen::MatrixXd bnd_uv;
+        igl::map_vertices_to_circle(Vmpatch1,bnd,bnd_uv);
+
+        Eigen::MatrixXd V_uv;
+        igl::harmonic(Vmpatch1,Fmpatch1,bnd,bnd_uv,1,V_uv);
+
+        std::cout << V_uv << std::endl;
+
+        Eigen::VectorXi bb = Eigen::VectorXi(bnd.rows());
+        for (int i = 0; i < bnd.rows(); i++) {
+            bb(i) = Vmidx[bnd(i)];
+        }
+        Eigen::MatrixXd Bonedest(bnd.rows(), 3);
+        for (int i = 0; i < bnd.rows(); i++) {
+            Bonedest.row(i) = musVNew.row(bnd(i));
+        }
+        Eigen::MatrixXd musclef(bnd.rows(), 3);
+        for (int i = 0; i < bnd.rows(); i++) {
+            musclef.row(i) = Vmpatch1.row(bnd(i));
+        }
+        std::cout << "end " << std::endl;
+
+        igl::ARAPData data;
+        igl::arap_precomputation(Vm, Fm, 3, bb, data);
+        //int ninterp = 10;
+        int ninterp = 10;
+        for (int ni = 1; ni <= ninterp; ni++) {
+            double t = double (ni) / double (ninterp);
+            //std::cout<< (1-t)*Fcc + t*Bcc <<std::endl;
+            Eigen::MatrixXd currdest = (1-t)*musclef + t*Bonedest;
+            igl::arap_solve(currdest, data, Vm);
+        }
+
+        VV.push_back(Vm);
+        FF.push_back(Fm);
+    }
+//    double area1 = 0; double num1 = 0;
+//    Eigen::MatrixXi Fpatch1(1, 3);
+//    int Vidx[3*selected_faces1.size()];
+//    std::set<int> s1;
+//    int numdistinct = 0;
+//    Eigen::RowVector3d center1 = Eigen::RowVector3d::Zero();
+//
+//    for (auto it = selected_faces1.begin(); it != selected_faces1.end(); ++it) {
+//        // currently only one face is selected in face 1
+//        ++it;
+//        if (it == selected_faces1.end()) {
+//            break;
+//        }
+//        --it;
+//        // delete the above portion when selected_faces1 and selected_faces are correctly implemented
+//
+//        num1 += 1;
+//        int curr = std::distance(selected_faces1.begin(), it);
+//        Eigen::RowVectorXi triangle = F.row(*it);
+//        Eigen::RowVector3d triangleCenter = (V.row(triangle(0)) + V.row(triangle(1)) + V.row(triangle(2))) / 3.0;
+//        center1 += triangleCenter;
+//
+//        double a = (V.row(triangle(0)) - V.row(triangle(1))).norm();
+//        double b = (V.row(triangle(1)) - V.row(triangle(2))).norm();
+//        double c = (V.row(triangle(2)) - V.row(triangle(0))).norm();
+//        double s = (a+b+c) / 2.;
+//        area1 += pow(s*(s-a)*(s-b)*(s-c), 0.5);
+//
+//        // Construct smaller mesh for the patch on bone
+//        for (int j = 0; j < 3; j++) {
+//            int fj = triangle(j);
+//            auto result = s1.insert(fj);
+//            if ( result.second ) {
+//                Vidx[numdistinct] = fj;
+//                Fpatch1(curr, j) = numdistinct;
+//                numdistinct++;
+//            } else {
+//                for (int k = 0; k < numdistinct; k++) {
+//                    if (Vidx[k] == fj) {
+//                        Fpatch1(curr, j) = k;
+//                    }
+//                }
+//            }
+//        }
+//
 //    }
+//    center1 = 1./num1 * center1;
+//    Eigen::MatrixXd Vpatch1(numdistinct, 3);
+//    for (int i = 0; i < numdistinct; i++) {
+//        Vpatch1.row(i) = V.row(Vidx[i]);
+//    }
+//
+//    std::cout << "num1 " << num1 <<std::endl;
+//    std::cout << "center1 " << center1 <<std::endl;
+//
+//
+//
+//    // Determine the total number of faces on the muscle to be deformed towards bone
+//    int sourcenum1 = ceil(area1 / avg_area);
+////    sourcenum1 = 100;
+//    std::cout << "sourcenum1 " << sourcenum1 << std::endl;
+//    Eigen::MatrixXd lst_dist(Fm.rows(), 1);
+//    triangle_hunt_lst(center1, Vm, Fm, lst_dist);
+//    Eigen::MatrixXd sY, sIX;
+//    igl::sort(lst_dist, 1, true, sY, sIX);
+//
+//    Eigen::MatrixXd closest1 = sIX.block(0, 0, sourcenum1, 1);
+//    Eigen::MatrixXi Fmpatch1(closest1.rows(), 3);
+//    int Vmidx[3*closest1.rows()];
+//    numdistinct = 0;
+//
+//    // Get the total number of distinct vertices
+//    std::set<int> sm1;
+//    for (int i = 0; i < closest1.rows(); i++) {
+//        for (int j = 0; j < 3; j++) {
+//            int fj = Fm(closest1(i), j);
+//            auto result = sm1.insert(fj);
+//            if ( result.second ) {
+//                Vmidx[numdistinct] = fj;
+//                Fmpatch1(i, j) = numdistinct;
+//                numdistinct++;
+//            } else {
+//                for (int k = 0; k < numdistinct; k++) {
+//                    if (Vmidx[k] == fj) {
+//                        Fmpatch1(i, j) = k;
+//                    }
+//                }
+//            }
+//        }
+//    }
+//    std::cout << "loop " << std::endl;
+//    Eigen::MatrixXd Vmpatch1(numdistinct, 3);
+//    for (int i = 0; i < numdistinct; i++) {
+//        Vmpatch1.row(i) = Vm.row(Vmidx[i]);
+//    }
+//    std::cout << "loop2 " << std::endl;
+//
+////    for (int i = 0; i < closest1.rows(); i++) {
+////        Fpatch1.row(i) = Fm.row(closest1(i));
+////    }
+//
+//    Eigen::Vector3d t = Eigen::Vector3d::Ones() * 1;
+////    translate_V(Vpatch1, t);
+//    std::cout << "loop 3" << std::endl;
+//
+//    Eigen::MatrixXd musVNew;
+//    map_move_patch(Vmpatch1, Fmpatch1, Vpatch1, Fpatch1, musVNew);
+//
+//    std::cout << "loop 4" << std::endl;
+//    Eigen::VectorXi bnd;
+//    igl::boundary_loop(Fmpatch1,bnd);
+//    std::cout << "loop 5" << std::endl;
+//
+////    VV.push_back(Vmpatch1);
+////    FF.push_back(Fmpatch1);
+////    VV.push_back(Vpatch1);
+////    FF.push_back(Fpatch1);
+//
+//    Eigen::MatrixXd bnd_uv;
+//    igl::map_vertices_to_circle(Vmpatch1,bnd,bnd_uv);
+//
+//    Eigen::MatrixXd V_uv;
+//    igl::harmonic(Vmpatch1,Fmpatch1,bnd,bnd_uv,1,V_uv);
+//
+//    std::cout << V_uv << std::endl;
+//
+//    Eigen::VectorXi bb = Eigen::VectorXi(bnd.rows());
+//    for (int i = 0; i < bnd.rows(); i++) {
+//        bb(i) = Vmidx[bnd(i)];
+//    }
+//    Eigen::MatrixXd Bonedest(bnd.rows(), 3);
+//    for (int i = 0; i < bnd.rows(); i++) {
+//        Bonedest.row(i) = musVNew.row(bnd(i));
+//    }
+//    Eigen::MatrixXd musclef(bnd.rows(), 3);
+//    for (int i = 0; i < bnd.rows(); i++) {
+//        musclef.row(i) = Vmpatch1.row(bnd(i));
+//    }
+//    std::cout << "end " << std::endl;
 
-    Eigen::Vector3d t = Eigen::Vector3d::Ones() * 1;
-//    translate_V(Vpatch1, t);
-    std::cout << "loop 3" << std::endl;
 
-    Eigen::MatrixXd musVNew;
-    map_move_patch(Vmpatch1, Fmpatch1, Vpatch1, Fpatch1, musVNew);
-
-    std::cout << "loop 4" << std::endl;
-    Eigen::VectorXi bnd;
-    igl::boundary_loop(Fmpatch1,bnd);
-    std::cout << "loop 5" << std::endl;
-
-//    VV.push_back(Vmpatch1);
-//    FF.push_back(Fmpatch1);
-//    VV.push_back(Vpatch1);
-//    FF.push_back(Fpatch1);
-
-    Eigen::MatrixXd bnd_uv;
-    igl::map_vertices_to_circle(Vmpatch1,bnd,bnd_uv);
-
-    Eigen::MatrixXd V_uv;
-    igl::harmonic(Vmpatch1,Fmpatch1,bnd,bnd_uv,1,V_uv);
-
-    std::cout << V_uv << std::endl;
-
-    Eigen::VectorXi bb = Eigen::VectorXi(bnd.rows());
-    for (int i = 0; i < bnd.rows(); i++) {
-        bb(i) = Vmidx[bnd(i)];
-    }
-    Eigen::MatrixXd Bonedest(bnd.rows(), 3);
-    for (int i = 0; i < bnd.rows(); i++) {
-        Bonedest.row(i) = musVNew.row(bnd(i));
-    }
-    Eigen::MatrixXd musclef(bnd.rows(), 3);
-    for (int i = 0; i < bnd.rows(); i++) {
-        musclef.row(i) = Vmpatch1.row(bnd(i));
-    }
-    std::cout << "end " << std::endl;
-
-
-    igl::ARAPData data;
-    igl::arap_precomputation(Vm, Fm, 3, bb, data);
-    //int ninterp = 10;
-    int ninterp = 10;
-    for (int ni = 1; ni <= ninterp; ni++) {
-        double t = double (ni) / double (ninterp);
-        //std::cout<< (1-t)*Fcc + t*Bcc <<std::endl;
-        Eigen::MatrixXd currdest = (1-t)*musclef + t*Bonedest;
-        igl::arap_solve(currdest, data, Vm);
-    }
-
-
-    VV.push_back(Vm);
-    FF.push_back(Fm);
+//    igl::ARAPData data;
+//    igl::arap_precomputation(Vm, Fm, 3, bb, data);
+//    //int ninterp = 10;
+//    int ninterp = 10;
+//    for (int ni = 1; ni <= ninterp; ni++) {
+//        double t = double (ni) / double (ninterp);
+//        //std::cout<< (1-t)*Fcc + t*Bcc <<std::endl;
+//        Eigen::MatrixXd currdest = (1-t)*musclef + t*Bonedest;
+//        igl::arap_solve(currdest, data, Vm);
+//    }
+//
+//
+//    VV.push_back(Vm);
+//    FF.push_back(Fm);
 }

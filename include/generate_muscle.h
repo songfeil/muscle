@@ -13,7 +13,7 @@ void generate_muscle(const Eigen::MatrixXd & points,
                      const int num_points,
                      const Eigen::MatrixXd & V,
                      const Eigen::MatrixXi & F,
-                     const std::set<int> & selected_faces,
+                     const std::vector<Eigen::MatrixXi> & selected_faces,
                      std::vector<Eigen::MatrixXd> & VV,
                      std::vector<Eigen::MatrixXi> & FF);
 
@@ -21,8 +21,7 @@ void generate_muscle_multiface(const Eigen::MatrixXd & points,
                      const int num_points,
                      const Eigen::MatrixXd & V,
                      const Eigen::MatrixXi & F,
-                     const std::set<int> & selected_faces1,
-                     const std::set<int> & selected_faces2,
+                     const std::vector<Eigen::MatrixXi> & selected_faces,
                      std::vector<Eigen::MatrixXd> & VV,
                      std::vector<Eigen::MatrixXi> & FF);
 

@@ -338,8 +338,8 @@ int main(int argc, char *argv[])
           for (const auto & patch : s.patch_fids) {
             face_per_patch.insert(patch.at(0));
           }
-          generate_muscle(s.control_points, s.n_points, s.V, s.F, face_per_patch, s.VV, s.FF);
-          //generate_muscle_multiface(s.control_points, s.n_points, s.V, s.F, face_per_patch, face_per_patch, s.VV, s.FF);
+//          generate_muscle(s.control_points, s.n_points, s.V, s.F, s.patch_faces, s.VV, s.FF);
+          generate_muscle_multiface(s.control_points, s.n_points, s.V, s.F, s.patch_faces, s.VV, s.FF);
           s.control_points.resize(0, 3);
           s.n_points = 0;
 
