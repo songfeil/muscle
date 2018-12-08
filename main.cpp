@@ -339,7 +339,8 @@ int main(int argc, char *argv[])
             face_per_patch.insert(patch.at(0));
           }
 //          generate_muscle(s.control_points, s.n_points, s.V, s.F, s.patch_faces, s.VV, s.FF);
-          generate_muscle_multiface(s.control_points, s.n_points, s.V, s.F, s.patch_faces, s.VV, s.FF);
+//          generate_muscle_multiface(s.control_points, s.n_points, s.V, s.F, s.patch_faces, s.VV, s.FF);
+          generate_tendon(s.control_points, s.n_points, s.V, s.F, s.patch_faces, s.VV, s.FF);
           s.control_points.resize(0, 3);
           s.n_points = 0;
 

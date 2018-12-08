@@ -25,4 +25,12 @@ void generate_muscle_multiface(const Eigen::MatrixXd & points,
                      std::vector<Eigen::MatrixXd> & VV,
                      std::vector<Eigen::MatrixXi> & FF);
 
+void generate_tendon(const Eigen::MatrixXd & points,
+                     const int num_points,
+                     const Eigen::MatrixXd & V,
+                     const Eigen::MatrixXi & F,
+                     const std::vector<Eigen::MatrixXi> & selected_faces,
+                     std::vector<Eigen::MatrixXd> & VV,
+                     std::vector<Eigen::MatrixXi> & FF);
+
 #endif //INTRODUCTION_GENERATE_MUSCLE_H
