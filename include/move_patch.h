@@ -36,20 +36,20 @@ void origin_scaling(Eigen::MatrixXd & V, double s) {
 }
 
 int between_vertices(double query_rad, const Eigen::VectorXd & rads) {
-    // All rads between 0 - 2 * PI
+    // All rads between 2 * PI - 0
     int size = rads.size();
     for (int i = 0; i < size; i++) {
         int j = (i + 1) % size;
-        int ti = (i + 1) / size;
+        int ti = (i + 1) > size ? 1 : 0;
 
-        if (query_rad >= rads(i) && query_rad < rads(j) + ti * 2 * M_PI) {
+        if (query_rad <= rads(i) && query_rad > rads(j) - ti * 2 * M_PI) {
             return i;
         }
     }
 
     std::cout << "return -1\n";
 
-    return -1;
+    return size - 1;
 }
 
 void translate_move_patch(
@@ -93,9 +93,29 @@ void map_move_patch(
     Eigen::VectorXi musBND_orig, musBND;
     igl::boundary_loop(musF, musBND_orig);
     musBND.resize(musBND_orig.size());
+    // Flip the boundary point order
     for (int i = 0; i < musBND_orig.rows(); i++) {
         musBND(i) = musBND_orig(musBND_orig.rows()-1-i);
     }
+    musBND_orig = musBND;
+
+    // Pick the proper starting point in the loop
+    int start_idx = 0;
+    double ndist = std::numeric_limits<double>::infinity();
+    Eigen::Vector3d target = bonV.row(bonBND(0));
+    for (int i = 0; i < musBND.size(); i++) {
+        Eigen::Vector3d q = musV.row(musBND_orig(i));
+        if ((q - target).norm() < ndist) {
+            ndist = (q - target).norm();
+            start_idx = i;
+        }
+    }
+
+    for (int i = 0; i < musBND.size(); i++) {
+        int idx = (start_idx + i) % musBND.size();
+        musBND(i) = musBND_orig(idx);
+    }
+
     Eigen::MatrixXd mus_uv;
     igl::map_vertices_to_circle(musV, musBND, mus_uv);
     Eigen::MatrixXd musU, musBND_U;
@@ -110,6 +130,8 @@ void map_move_patch(
     for (int i = 0; i < musBND.size(); i++) {
         double rad = atan2(musBND_U(i,0), musBND_U(i, 1)) + M_PI;
         rad = rad < 0 ? rad + 2 * M_PI : rad;
+        rad = rad + 0.5 * M_PI;
+        rad = rad > 2 * M_PI ? rad - 2 * M_PI : rad;
         mus_bound_rad(i) = rad;
     }
 
@@ -117,22 +139,36 @@ void map_move_patch(
     for (int i = 0; i < bonBND.size(); i++) {
         double rad = atan2(bonBND_U(i,0), bonBND_U(i, 1)) + M_PI;
         rad = rad < 0 ? rad + 2 * M_PI : rad;
+        rad = rad + 0.5 * M_PI;
+        rad = rad > 2 * M_PI ? rad - 2 * M_PI : rad;
         bon_bound_rad(i) = rad;
+
     }
+
+    std::cout << "mus_bound_rad" <<std::endl;
+    std::cout << mus_bound_rad <<std::endl;
+
 
     std::cout << "info loaded" << std::endl;
 
     musVNew = musV;
     for (int i = 0; i < mus_bound_rad.size(); i++) {
         double q = mus_bound_rad(i);
+
         int idx = between_vertices(q, bon_bound_rad);
         int idy = (idx + 1) % bon_bound_rad.size();
 
-        double interval = bon_bound_rad(idy) - bon_bound_rad(idx);
-        double query_interval = q - bon_bound_rad(idx);
+        std::cout << "query" << q << " between " << bon_bound_rad(idx) << "and" << bon_bound_rad(idy) << std::endl;
+
+        double brady = idy == 0 ? bon_bound_rad(idy) - 2 * M_PI : bon_bound_rad(idy);
+
+        double interval = bon_bound_rad(idx) - brady;
+        double query_interval = bon_bound_rad(idx) - q;
         double percentage = query_interval / interval;
 
-        Eigen::RowVector3d new_pos = percentage * bonV.row(idx) + (1 - percentage) * bonV.row(idy);
+        std::cout << "percentage " << percentage <<std::endl;
+
+        Eigen::RowVector3d new_pos = (1 - percentage) * bonV.row(idx) + (percentage) * bonV.row(idy);
         musVNew.row(musBND(i)) = new_pos;
     }
     std::cout << "cal finished" << std::endl;

@@ -80,7 +80,7 @@ void volume_along_curve(const Eigen::MatrixXd & curve,
         double radius = radiusFunc(0.5, (double)i/n);
         Eigen::MatrixXd circle2D, circle2dNorm;
 //      generate_circle(circleSampleCount, radius, circle2D);
-        generate_disk(circleSampleCount, radius, radius * 0.5, circle2D, circle2dNorm);
+        generate_disk(circleSampleCount, radius, radius * 1, circle2D, circle2dNorm);
 
         Eigen::Vector3d N, T, B, pos;
         N = normal.row(i);

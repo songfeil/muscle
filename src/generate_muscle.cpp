@@ -20,6 +20,7 @@
 #include <vector>
 #include <move_patch.h>
 #include <PCA_elipse.h>
+#include <igl/per_vertex_attribute_smoothing.h>
 
 void generate_muscle(const Eigen::MatrixXd & points,
                      const int num_points,
@@ -28,7 +29,7 @@ void generate_muscle(const Eigen::MatrixXd & points,
                      const std::vector<Eigen::MatrixXi> & selected_faces,
                      std::vector<Eigen::MatrixXd> & VV,
                      std::vector<Eigen::MatrixXi> & FF) {
-    Eigen::MatrixXd Vm;
+    Eigen::MatrixXd Vm, Vm_before_smooth;
     Eigen::MatrixXi Fm;
     Eigen::MatrixXd p  = points.block(points.rows() - num_points, 0, num_points, 3);
     p.colwise().reverse();
@@ -41,7 +42,9 @@ void generate_muscle(const Eigen::MatrixXd & points,
     volume_along_curve(Bc, Nc, pV, pN);
     Eigen::MatrixXd All(pV.rows(), 6);
     All << pV, pN;
-    poisson_surface_reconstruction(pV, pN, Vm, Fm);
+    poisson_surface_reconstruction(pV, pN, Vm_before_smooth, Fm);
+    // Smooth before doing any of the face-matching operations
+    igl::per_vertex_attribute_smoothing(Vm_before_smooth, Fm, Vm);
 
     Eigen::VectorXi bb = Eigen::VectorXi(selected_faces.size()*3);
     Eigen::MatrixXd Bonedest(selected_faces.size()*3, 3);
@@ -127,8 +130,14 @@ void generate_muscle_multiface(const Eigen::MatrixXd & points,
                                const std::vector<Eigen::MatrixXi> & selected_faces,
                                std::vector<Eigen::MatrixXd> & VV,
                                std::vector<Eigen::MatrixXi> & FF) {
-    Eigen::MatrixXd Vm;
+    Eigen::MatrixXd Vm, Vm_before_smooth;
     Eigen::MatrixXi Fm;
+
+    int large_num = 1000;
+    Eigen::VectorXi bb = Eigen::VectorXi(large_num);
+    Eigen::MatrixXd Bonedest(large_num, 3);
+    Eigen::MatrixXd musclef(large_num, 3);
+    int cum_bnd = 0;
     Eigen::MatrixXd p  = points.block(points.rows() - num_points, 0, num_points, 3);
     p.colwise().reverse();
     // Your code here to populate V and F
@@ -140,7 +149,8 @@ void generate_muscle_multiface(const Eigen::MatrixXd & points,
     volume_along_curve(Bc, Nc, pV, pN);
     Eigen::MatrixXd All(pV.rows(), 6);
     All << pV, pN;
-    poisson_surface_reconstruction(pV, pN, Vm, Fm);
+    poisson_surface_reconstruction(pV, pN, Vm_before_smooth, Fm);
+    igl::per_vertex_attribute_smoothing(Vm_before_smooth, Fm, Vm);
 
 
     // Calculate average surface area of muscle mesh
@@ -165,9 +175,9 @@ void generate_muscle_multiface(const Eigen::MatrixXd & points,
         int numdistinct = 0;
         Eigen::RowVector3d center1 = Eigen::RowVector3d::Zero();
         int curr = std::distance(selected_faces.begin(), it);
-        if (curr == 1) {
-            break;
-        }
+//        if (curr == 1) {
+//            break;
+//        }
         for (int i = 0; i < curr_patch.rows(); i++) {
             num1 += 1;
             Eigen::RowVectorXi triangle = curr_patch.row(i);
@@ -204,13 +214,12 @@ void generate_muscle_multiface(const Eigen::MatrixXd & points,
             Vpatch1.row(i) = V.row(Vidx[i]);
         }
 
-        std::cout << "loop num1 " << num1 <<std::endl;
-        std::cout << "loop center1 " << center1 <<std::endl;
-
+        std::cout<< "bone patch vertices\n";
+        std::cout<< Vpatch1 << std::endl;
 
         // Determine the total number of faces on the muscle to be deformed towards bone
         int sourcenum1 = ceil(area1 / avg_area);
-        std::cout << "loop sourcenum1 " << sourcenum1 << std::endl;
+        sourcenum1 = 1;
         Eigen::MatrixXd lst_dist(Fm.rows(), 1);
         triangle_hunt_lst(center1, Vm, Fm, lst_dist);
         Eigen::MatrixXd sY, sIX;
@@ -245,15 +254,6 @@ void generate_muscle_multiface(const Eigen::MatrixXd & points,
             Vmpatch1.row(i) = Vm.row(Vmidx[i]);
         }
 
-        struct elipse_param ep = PCA_param(Vpatch1, Fpatch1);
-        std::cout << "elipse ep print" << std::endl;
-        std::cout << ep.long_axis << std::endl;
-        std::cout << ep.long_dir << std::endl;
-        std::cout << ep.short_axis << std::endl;
-        std::cout << ep.short_dir << std::endl;
-        std::cout << ep.center << std::endl;
-        std::cout << ep.normal << std::endl;
-
         Eigen::MatrixXd musVNew;
         map_move_patch(Vmpatch1, Fmpatch1, Vpatch1, Fpatch1, musVNew);
 
@@ -268,34 +268,32 @@ void generate_muscle_multiface(const Eigen::MatrixXd & points,
 
         std::cout << V_uv << std::endl;
 
-        Eigen::VectorXi bb = Eigen::VectorXi(bnd.rows());
         for (int i = 0; i < bnd.rows(); i++) {
-            bb(i) = Vmidx[bnd(i)];
-        }
-        Eigen::MatrixXd Bonedest(bnd.rows(), 3);
-        for (int i = 0; i < bnd.rows(); i++) {
-            Bonedest.row(i) = musVNew.row(bnd(i));
-        }
-        Eigen::MatrixXd musclef(bnd.rows(), 3);
-        for (int i = 0; i < bnd.rows(); i++) {
-            musclef.row(i) = Vmpatch1.row(bnd(i));
-        }
-        std::cout << "end " << std::endl;
-
-        igl::ARAPData data;
-        igl::arap_precomputation(Vm, Fm, 3, bb, data);
-        //int ninterp = 10;
-        int ninterp = 10;
-        for (int ni = 1; ni <= ninterp; ni++) {
-            double t = double (ni) / double (ninterp);
-            //std::cout<< (1-t)*Fcc + t*Bcc <<std::endl;
-            Eigen::MatrixXd currdest = (1-t)*musclef + t*Bonedest;
-            igl::arap_solve(currdest, data, Vm);
+            bb(cum_bnd + i) = Vmidx[bnd(i)];
         }
 
-        VV.push_back(Vm);
-        FF.push_back(Fm);
+        for (int i = 0; i < bnd.rows(); i++) {
+            Bonedest.row(cum_bnd + i) = musVNew.row(bnd(i));
+        }
+
+        for (int i = 0; i < bnd.rows(); i++) {
+            musclef.row(cum_bnd + i) = Vmpatch1.row(bnd(i));
+        }
+        cum_bnd = cum_bnd + bnd.rows();
     }
+    igl::ARAPData data;
+    Eigen::VectorXi bbs = bb.segment(0, cum_bnd);
+    igl::arap_precomputation(Vm, Fm, 3, bbs, data);
+    //int ninterp = 10;
+    int ninterp = 10;
+    for (int ni = 1; ni <= ninterp; ni++) {
+        double t = double (ni) / double (ninterp);
+        //std::cout<< (1-t)*Fcc + t*Bcc <<std::endl;
+        Eigen::MatrixXd currdest = (1-t)*musclef.block(0, 0, cum_bnd, 3) + t*Bonedest.block(0, 0, cum_bnd, 3);
+        igl::arap_solve(currdest, data, Vm);
+    }
+    VV.push_back(Vm);
+    FF.push_back(Fm);
 //    double area1 = 0; double num1 = 0;
 //    Eigen::MatrixXi Fpatch1(1, 3);
 //    int Vidx[3*selected_faces1.size()];
