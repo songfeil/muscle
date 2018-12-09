@@ -71,3 +71,18 @@ void add_face_to_patch( const int fid,
 
   std::cout << "NEW PATCH: num patches is " << patches.size() << std::endl;
 }
+
+void verts_within_x_range(const double xmin,
+                          const double xmax,
+                          const Eigen::MatrixXd & V,
+                          std::vector<int> & vids) {
+    double x;
+    for (int i = 0; i < V.rows(); i++) {
+        x = V(i, 0);
+        //std::cout << x << std::endl;
+        
+        if ((x < xmax) && (x > xmin)) {
+            vids.push_back(i);
+        }
+    }
+}

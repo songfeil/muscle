@@ -16,4 +16,9 @@ void add_face_to_patch( const int fid,
                         std::vector<Eigen::MatrixXi> & patches,
                         std::vector<std::vector<int>> & patch_fids );
 
+void verts_within_x_range(const double xmin,
+                          const double xmax,
+                          const Eigen::MatrixXd & V,
+                          std::vector<int> & vids);
+
 #endif //INTRODUCTION_UI_HELPERS_H

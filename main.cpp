@@ -4,11 +4,14 @@
 #include <igl/read_triangle_mesh.h>
 #include <igl/writeOBJ.h>
 #include <igl/adjacency_matrix.h>
+#include <igl/per_vertex_attribute_smoothing.h>
+#include <igl/arap.h>
 
 #include <Eigen/Geometry>
 #include <Eigen/Sparse>
 
 #include <vector>
+#include <set>
 #include <string>
 #include <iostream>
 #include <stack>
@@ -16,7 +19,7 @@
 #include "ui_helpers.h"
 #include "generate_bone.h"
 #include "generate_muscle.h"
-//#include "inflate_muscle.h"
+#include "xflate_muscle.h"
 
 /* Input mode enum */
 enum Mode
@@ -25,6 +28,7 @@ enum Mode
   BONE = 1,
   MUSCLE = 2,
   FACE_SELECT = 3,
+  XFLATE = 4
 };
 
 /* Color consts */
@@ -32,6 +36,8 @@ const Eigen::RowVector3d red(1.0,0.0,0.2);
 const Eigen::RowVector3d yellow(1.0,0.9,0.2);
 const Eigen::RowVector3d blue(0.2,0.3,0.8);
 const Eigen::RowVector3d green(0.2,0.6,0.3);
+const Eigen::RowVector3d white(1.0, 1.0, 1.0);
+const Eigen::RowVector3d pink(1.0,0.2,0.2);
 Eigen::RowVector3d patch_colors[3] = {yellow, red, blue};
 
 /* GLOBAL STATE :-) */
@@ -43,6 +49,11 @@ struct State
   // Lists of meshes
   std::vector<Eigen::MatrixXd> VV; 
   std::vector<Eigen::MatrixXi> FF;
+  // Muscle meshes
+  Eigen::MatrixXd Vm;
+  Eigen::MatrixXi Fm;
+  std::set<int> fixed_vids;
+  bool muscle_generated = false;
   // Total combination of all meshes to be displayed
   Eigen::MatrixXd V;
   Eigen::MatrixXi F;
@@ -63,6 +74,7 @@ Eigen::Vector3d last_mouse;
 bool bone_started = false;
 bool mouse_down = false;
 int hover_point_index = -1;
+double xflate_width = 0.5;
 
 // Bone mesh template
 Eigen::MatrixXd Vbone;
@@ -100,6 +112,7 @@ int main(int argc, char *argv[])
 
   /* Instantiate libigl Viewer */
   igl::opengl::glfw::Viewer viewer;
+  viewer.core.lighting_factor = 0.1;
   std::cout << "========= MUSCLE/BONE GENERATION =========" << std::endl;
   std::cout << " B,b \t Bone input mode \n M,m \t Muscle input mode \n[space]  No mode (can drag around scene again)" << std::endl;
 
@@ -116,15 +129,27 @@ int main(int argc, char *argv[])
     if (s.VV.size() > 0) {
       
       // New mesh!
-      if (update_mesh) {
+      int n_Fm = 0;
+      if (s.muscle_generated){
+        n_Fm = s.Fm.rows();
+        s.VV.push_back(s.Vm);
+        s.FF.push_back(s.Fm);
+        igl::combine(s.VV,s.FF,s.V,s.F);
+        viewer.data().set_mesh(s.V,s.F);
+        s.VV.pop_back();
+        s.FF.pop_back();
+      } else {
         igl::combine(s.VV,s.FF,s.V,s.F);
         viewer.data().set_mesh(s.V,s.F);
       }
       
-      // Reset colors
+      // Reset color
       s.face_colors.resize(s.F.rows(), 3);
-      for (int i = 0; i < s.F.rows(); i++) {
-        s.face_colors.row(i) = green;
+      for (int i = 0; i < s.F.rows() - n_Fm; i++) {
+        s.face_colors.row(i) = white;
+      }
+      for (int i = s.F.rows() - n_Fm; i < s.F.rows(); i++ ){
+        s.face_colors.row(i) = pink;
       }
 
       // Color each patch differently
@@ -277,6 +302,20 @@ int main(int argc, char *argv[])
 
       // }
       
+    } else if (mode == XFLATE) {
+      Eigen::Vector3d intersection;
+      intersection_with_xy_plane(viewer, last_mouse, intersection);
+      std::cout << intersection << std::endl;
+      std::vector<int> vids;
+      verts_within_x_range(intersection(0) - xflate_width, intersection(0) + xflate_width, s.Vm, vids);
+      std::cout << vids.size() << std::endl;
+      Eigen::MatrixXd v_colors = Eigen::MatrixXd::Constant(s.V.rows(), 3, 0.3);
+      int offset = s.V.rows() - s.Vm.rows();
+      for (int v : vids) {
+        v_colors.row(v + offset) = red;
+      }
+      viewer.data().set_colors(v_colors);
+
     }
     return false;
   };
@@ -338,7 +377,8 @@ int main(int argc, char *argv[])
           for (const auto & patch : s.patch_fids) {
             face_per_patch.insert(patch.at(0));
           }
-          generate_muscle(s.control_points, s.n_points, s.V, s.F, face_per_patch, s.VV, s.FF);
+          generate_muscle(s.control_points, s.n_points, s.V, s.F, face_per_patch, s.Vm, s.Fm, s.fixed_vids);
+          s.muscle_generated = true;
           //generate_muscle_multiface(s.control_points, s.n_points, s.V, s.F, face_per_patch, face_per_patch, s.VV, s.FF);
           s.control_points.resize(0, 3);
           s.n_points = 0;
@@ -349,19 +389,61 @@ int main(int argc, char *argv[])
       }
       case 'i':
       {
-        // // Inflate muscle mesh
-        // Eigen::MatrixXd Vnew;
-        // Eigen::MatrixXi Fnew;
-        // Eigen::MatrixXd muscle_mesh = s.VV.back(); // Assuming muscle was last mesh added
-        // int start = s.V.rows() - muscle_mesh.rows();
-        // int end = s.V.rows();
-        // inflate_muscle(s.V, s.F, start, end, Vnew);
-        // s.VV.pop_back();
-        // s.VV.push_back(Vnew);
-        // std::cout << "INFLATE" << std::endl;
-        // break;
+        push_undo(s);
+        // Inflate muscle mesh
+        if (mode == XFLATE) {
+          std::vector<int> vids;
+          Eigen::Vector3d intersection;
+          intersection_with_xy_plane(viewer, last_mouse, intersection);
+          xflate_verts_in_xrange(s.Vm, s.Fm, intersection(0), xflate_width, 1, s.fixed_vids, s.Vm);
+        } else {
+          xflate_muscle(s.Vm, s.Fm, 0, s.Vm.rows(), 1, s.Vm);
+        }
+        
+        update(true);
+        break;
+      }
+      case 'd':
+      {
+        if (mode == XFLATE)
+        // Deflate muscle mesh
+        push_undo(s);
+        if (mode == XFLATE) {
+          std::vector<int> vids;
+          Eigen::Vector3d intersection;
+          intersection_with_xy_plane(viewer, last_mouse, intersection);
+          xflate_verts_in_xrange(s.Vm, s.Fm, intersection(0), xflate_width, -1, s.fixed_vids, s.Vm);
+        } else {
+          xflate_muscle(s.Vm, s.Fm, 0, s.Vm.rows(), -1, s.Vm);
+        }
+        update(true);
+        break;
+      }
+      case 'x':
+      {
+        mode = XFLATE;
+        break;
+      }
+      case '>':
+      {
+        xflate_width += 0.1;
+        break;
+      }
+      case '<':
+      {
+        xflate_width -= 0.1;
+        break;
       }
       case 's':
+      {
+        push_undo(s);
+        Eigen::MatrixXd V_smooth(s.Vm.rows(), 3);
+        igl::per_vertex_attribute_smoothing(s.Vm, s.Fm, V_smooth);
+        s.Vm = V_smooth;
+        update(true);
+        break;
+      }
+      case 'w':
       {
         Eigen::MatrixXd empty;
         igl::writeOBJ("output_all.obj", s.V, s.F, empty, empty, empty, empty);
