@@ -84,7 +84,7 @@ int triangle_hunts(Eigen::Matrix3d & P, Eigen::MatrixXd V, Eigen::MatrixXi F) {
 }
 
 
-void triangle_hunt_lst(Eigen::RowVector3d & P, Eigen::MatrixXd & V, Eigen::MatrixXi & F, Eigen::MatrixXd & lst_dist) {
+void triangle_hunt_lst(Eigen::RowVector3d & P, const Eigen::MatrixXd & V, const Eigen::MatrixXi & F, Eigen::MatrixXd & lst_dist) {
     // Record the distance from the center of each triangle on muscle to center point P of the selected faces on bone
     double dist = std::numeric_limits<double>::infinity();
     int fi = -1;

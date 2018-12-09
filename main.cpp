@@ -370,19 +370,18 @@ int main(int argc, char *argv[])
       {
         // Generate muscle from points
         if (s.n_points > 2) { // Need some points to work with...
-          // NO LONGER HAVE S.SELECTED_FACES...
-          // Just picking a face from each patch......
-          // Temporary!
-          std::set<int> face_per_patch; 
-          for (const auto & patch : s.patch_fids) {
-            face_per_patch.insert(patch.at(0));
-          }
-          generate_muscle(s.control_points, s.n_points, s.V, s.F, face_per_patch, s.Vm, s.Fm, s.fixed_vids);
-          s.muscle_generated = true;
-          //generate_muscle_multiface(s.control_points, s.n_points, s.V, s.F, face_per_patch, face_per_patch, s.VV, s.FF);
+
+         //generate_muscle(s.control_points, s.n_points, s.V, s.F, s.patch_faces, s.Vm, s.Fm, s.fixed_vids);
+          //  generate_muscle_multiface(s.control_points, s.n_points, s.V, s.F, s.patch_faces, s.Vm, s.Fm);
+          Eigen::MatrixXd Vt;
+          Eigen::MatrixXi Ft;
+         generate_tendon(s.control_points, s.n_points, s.V, s.F, s.patch_faces, s.Vm, s.Fm, Vt, Ft);
+         s.VV.push_back(Vt);
+         s.FF.push_back(Ft);
           s.control_points.resize(0, 3);
           s.n_points = 0;
-
+          std::cout << "V rows" << s.Vm.rows() << std::endl;
+          s.muscle_generated = true;
           update(true);
         }
         break;

@@ -60,18 +60,18 @@ void xflate_verts_in_xrange(const Eigen::MatrixXd & V,
     }
   }
 
-  igl::ARAPData data;
-  Eigen::VectorXi fixed(s.fixed_vids.size());
-  Eigen::MatrixXd V_smooth_fixed(s.fixed_vids.size(), 3);
-  int i = 0;
-  for (int ind : s.fixed_vids) {
-    V_smooth_fixed.row(i) = s.Vm.row(ind);
-    fixed(i) = ind;
-    i++;
-  }
-  std::cout << fixed << std::endl;
-  igl::arap_precomputation(V_smooth, s.Fm, 3, fixed, data);
-  igl::arap_solve(V_smooth_fixed, data, s.Vm);
+  // igl::ARAPData data;
+  // Eigen::VectorXi fixed(s.fixed_vids.size());
+  // Eigen::MatrixXd V_smooth_fixed(s.fixed_vids.size(), 3);
+  // int i = 0;
+  // for (int ind : s.fixed_vids) {
+  //   V_smooth_fixed.row(i) = s.Vm.row(ind);
+  //   fixed(i) = ind;
+  //   i++;
+  // }
+  // std::cout << fixed << std::endl;
+  // igl::arap_precomputation(V_smooth, s.Fm, 3, fixed, data);
+  // igl::arap_solve(V_smooth_fixed, data, s.Vm);
 
 }
 
