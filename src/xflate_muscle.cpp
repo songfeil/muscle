@@ -41,15 +41,11 @@ void xflate_verts_in_xrange(const Eigen::MatrixXd & V,
                     const double xmid,
                     const double xrange,
                     const int mode, // -1 = deflate, 1 = inflate
-                    std::set<int> fixed_verts,
                     Eigen::MatrixXd & Vnew){
   Eigen::MatrixXd N, V_new;
   igl::per_vertex_normals(V, F, igl::PerVertexNormalsWeightingType::PER_VERTEX_NORMALS_WEIGHTING_TYPE_ANGLE, N);
   Vnew = V.replicate(1, 1);
   for (int i = 0; i < Vnew.rows(); i++) {
-    if (fixed_verts.find(i) != fixed_verts.end()) {
-      continue;
-    }
     double x = Vnew(i, 0);
     double dist = std::abs(x - xmid);
     if (dist < (xrange * 1.5)) {
