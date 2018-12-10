@@ -72,6 +72,7 @@ void get_closest_patch(const Eigen::MatrixXd & V,
     closest1 = sIX.block(0, 0, sourcenum1, 1);
 }
 
+
 void interpolate_ellipse(
         int npoints,
         struct elipse_param ep,
@@ -89,22 +90,19 @@ void interpolate_ellipse(
     long_axis.resize(npoints);
     short_axis.resize(npoints);
 
-    std::cout << "elipse ep print" << std::endl;
-    std::cout << ep.long_axis << std::endl;
-    std::cout << ep.long_dir << std::endl;
-    std::cout << ep.short_axis << std::endl;
-    std::cout << ep.short_dir << std::endl;
-    std::cout << ep.center << std::endl;
-    std::cout << ep.normal << std::endl;
+    // Try to fix a little bit
+    Eigen::Vector3d dir = epm.center - ep.center;
+    epm.center += 0.1 * dir;
+    ep.center += - 0.05 * dir;
 
     for (int i = 0; i < npoints; i++) {
         double t = (double) i/ (double) npoints;
         curve.row(i) = t * epm.center + (1-t) * ep.center;
-        normal.row(i) = t * epm.normal.transpose() + (1-t) * epm.normal.transpose();
-        long_dir.row(i) = t * epm.long_dir.transpose() + (1-t) * epm.long_dir.transpose();
-        short_dir.row(i) = t * epm.short_dir.transpose() + (1-t) * epm.short_dir.transpose();
-        long_axis(i) = t * epm.long_axis + (1-t) * ep.long_axis;
-        short_axis(i) = t * epm.short_axis + (1-t) * ep.short_axis;
+        normal.row(i) = t * epm.normal.transpose() + (1-t) * ep.normal.transpose();
+        long_dir.row(i) = t * epm.long_dir.transpose() + (1-t) * ep.long_dir.transpose();
+        short_dir.row(i) = t * epm.short_dir.transpose() + (1-t) * ep.short_dir.transpose();
+        long_axis(i) = (pow(t, 1) * epm.long_axis + (1-pow(t, 1)) * ep.long_axis) * (1.2*pow(t-0.5, 2) + 0.7 );
+        short_axis(i) = (pow(t, 1) * epm.short_axis + (1-pow(t, 1)) * ep.short_axis ) * (1.2*pow(t-0.5, 2) + 0.7 ) ;
     }
 }
 
@@ -383,13 +381,14 @@ void attach_tendon(const Eigen::MatrixXd & V,
                     const Eigen::MatrixXd & Vm,
                     const Eigen::MatrixXi & Fm,
                     std::vector<Eigen::MatrixXd> & VV,
-                    std::vector<Eigen::MatrixXi> & FF
+                    std::vector<Eigen::MatrixXi> & FF,
                     std::set<int> & attached_vids) {
 
     // Calculate average surface area of muscle mesh
     Eigen::MatrixXd Vt;
     Eigen::MatrixXi Ft;
 
+    // Calculate average surface area of muscle mesh
     Eigen::MatrixXd dblA;
     igl::doublearea(Vm, Fm, dblA);
     double muscle_totalarea = 0;
@@ -433,6 +432,7 @@ void attach_tendon(const Eigen::MatrixXd & V,
         // Determine the total number of faces on the muscle to be connected and
         // generate a muscle patch
         int sourcenum1 = ceil(area1 / avg_area);
+        std::cout << sourcenum1 <<std::endl;
         Eigen::MatrixXi closest1;
         get_closest_patch(Vm, Fm, sourcenum1, center1, closest1);
         std::cout<<"get closest patch m " <<std::endl;
@@ -460,7 +460,10 @@ void attach_tendon(const Eigen::MatrixXd & V,
         // Fill in the interpolated values and generate point cloud
         interpolate_ellipse(20, ep, epm, curve, normal, long_dir, short_dir, long_axis, short_axis);
         ellipse_along_curve(curve, normal, long_axis, long_dir, short_axis, short_dir, tendonV, tendonN);
-        poisson_surface_reconstruction(tendonV, tendonN, Vt, Ft);
+
+        Eigen::MatrixXd Vt_before_smooth;
+        poisson_surface_reconstruction(tendonV, tendonN, Vt_before_smooth, Ft);
+        igl::per_vertex_attribute_smoothing(Vt_before_smooth, Ft, Vt);
 
         Eigen::Vector3d t = Eigen::Vector3d::Ones() * 1;
         translate_V(Vmpatch1, t);
@@ -480,7 +483,35 @@ void attach_tendon(const Eigen::MatrixXd & V,
         std::cout << epm.short_dir << std::endl;
         std::cout << epm.center << std::endl;
         std::cout << epm.normal << std::endl;
+
         VV.push_back(Vt);
         FF.push_back(Ft);
+//        map_move_patch(Vmpatch1, Fmpatch1, Vpatch1, Fpatch1, musVNew);
+//
+//        Eigen::VectorXi bnd;
+//        igl::boundary_loop(Fmpatch1,bnd);
+//
+//        Eigen::MatrixXd bnd_uv;
+//        igl::map_vertices_to_circle(Vmpatch1,bnd,bnd_uv);
+//
+//        Eigen::MatrixXd V_uv;
+//        igl::harmonic(Vmpatch1,Fmpatch1,bnd,bnd_uv,1,V_uv);
+//
+//        std::cout << V_uv << std::endl;
+//
+//        Eigen::VectorXi bb = Eigen::VectorXi(bnd.rows());
+//        for (int i = 0; i < bnd.rows(); i++) {
+//            bb(i) = Vmidx[bnd(i)];
+//        }
+//        Eigen::MatrixXd Bonedest(bnd.rows(), 3);
+//        for (int i = 0; i < bnd.rows(); i++) {
+//            Bonedest.row(i) = musVNew.row(bnd(i));
+//        }
+//        Eigen::MatrixXd musclef(bnd.rows(), 3);
+//        for (int i = 0; i < bnd.rows(); i++) {
+//            musclef.row(i) = Vmpatch1.row(bnd(i));
+//        }
+//        std::cout << "end " << std::endl;
+
     }
 }

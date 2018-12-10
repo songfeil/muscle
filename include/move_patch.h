@@ -78,35 +78,39 @@ void map_move_patch(
         Eigen::MatrixXi & bonF,
         Eigen::MatrixXd & musVNew
 ) {
-    Eigen::VectorXi bonBND;
-    igl::boundary_loop(bonF, bonBND);
-    Eigen::MatrixXd bon_uv;
-    igl::map_vertices_to_circle(bonV, bonBND, bon_uv);
-    Eigen::MatrixXd bonU, bonBND_U;
-    igl::harmonic(bonV,bonF,bonBND,bon_uv,1,bonU);
+    Eigen::VectorXi bonBND_orig, bonBND;
+    igl::boundary_loop(bonF, bonBND_orig);
+    bonBND.resize(bonBND_orig.size());
 
-    bonBND_U.resize(bonBND.size(), 2);
+    // Flip the boundary point order
+    int start_idx = 0;
+    double ndist = std::numeric_limits<double>::infinity();
     for (int i = 0; i < bonBND.size(); i++) {
-        bonBND_U.row(i) = bonU.row(bonBND(i));
+        int idx = (start_idx + i) % bonBND.size();
+        bonBND(i) = bonBND_orig(idx);
     }
-
     Eigen::VectorXi musBND_orig, musBND;
     igl::boundary_loop(musF, musBND_orig);
     musBND.resize(musBND_orig.size());
+
+
     // Flip the boundary point order
     for (int i = 0; i < musBND_orig.rows(); i++) {
         musBND(i) = musBND_orig(musBND_orig.rows()-1-i);
     }
     musBND_orig = musBND;
 
+    Eigen::RowVector3d bonCenter = bonV.colwise().mean();
+    Eigen::RowVector3d musCenter = musV.colwise().mean();
     // Pick the proper starting point in the loop
-    int start_idx = 0;
-    double ndist = std::numeric_limits<double>::infinity();
-    Eigen::Vector3d target = bonV.row(bonBND(0));
+    start_idx = 0;
+    ndist = std::numeric_limits<double>::infinity();
+    Eigen::RowVector3d target = musV.row(musBND(0)) - musCenter;
     for (int i = 0; i < musBND.size(); i++) {
         Eigen::Vector3d q = musV.row(musBND_orig(i));
-        if ((q - target).norm() < ndist) {
-            ndist = (q - target).norm();
+        double dot_product = - target(0) * q(0) + target(1) * q(1) + target(2) * q(2);
+        if ((dot_product / (target.norm() * q.norm())) < ndist) {
+            ndist = dot_product / (target.norm() * q.norm());
             start_idx = i;
         }
     }
@@ -116,10 +120,29 @@ void map_move_patch(
         musBND(i) = musBND_orig(idx);
     }
 
+    Eigen::MatrixXd bon_uv;
+    igl::map_vertices_to_circle(bonV, bonBND, bon_uv);
+    Eigen::MatrixXd bonU, bonBND_U;
+    igl::harmonic(bonV,bonF,bonBND,bon_uv,1,bonU);
+
     Eigen::MatrixXd mus_uv;
     igl::map_vertices_to_circle(musV, musBND, mus_uv);
     Eigen::MatrixXd musU, musBND_U;
     igl::harmonic(musV,musF,musBND,mus_uv,1,musU);
+
+    std::cout << "bon_boundary" << std::endl;
+    for (int i = 0; i < bonBND.size(); i++) {
+        std::cout<<bonV.row(bonBND(i))<<std::endl;
+    }
+    std::cout << "mus_boundary" << std::endl;
+    for (int i = 0; i < musBND.size(); i++) {
+        std::cout<<musV.row(musBND(i)) <<std::endl;
+    }
+
+    bonBND_U.resize(bonBND.size(), 2);
+    for (int i = 0; i < bonBND.size(); i++) {
+        bonBND_U.row(i) = bonU.row(bonBND(i));
+    }
 
     musBND_U.resize(musBND.size(), 2);
     for (int i = 0; i < musBND.size(); i++) {

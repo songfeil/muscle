@@ -373,7 +373,7 @@ int main(int argc, char *argv[])
         if (s.muscle_generated && (s.patch_faces.size() > 0)) {
           Eigen::MatrixXd Vt;
           Eigen::MatrixXi Ft;
-          attach_tendon(s.V, s.F, s.patch_faces, s.Vm, s.Fm, s.VV, s.FF);
+          attach_tendon(s.V, s.F, s.patch_faces, s.Vm, s.Fm, s.VV, s.FF, s.attached_vids);
           s.patch_faces.clear();
           update(true);
         }

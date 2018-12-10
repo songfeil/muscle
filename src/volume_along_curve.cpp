@@ -137,7 +137,7 @@ void ellipse_along_curve(const Eigen::MatrixXd & curve,
     // Either way we need to find normals to points on the curve
     // For now, our curves only exist on the X-Y plane (z = 0 for all points) just based on the user interface
     // So we can use that to our advantage, and generalize it later...
-    int circleSampleCount = 15;
+    int circleSampleCount = 50;
 
     // Define a function that reach the minimum at the midpoint
     auto radiusFunc = [](double max, double t){
