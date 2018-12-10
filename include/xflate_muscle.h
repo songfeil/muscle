@@ -23,7 +23,6 @@ void xflate_verts_in_xrange(const Eigen::MatrixXd & V,
                     const double xmid,
                     const double xrange,
                     const int mode, // -1 = deflate, 1 = inflate
-                    std::set<int> fixed_vids,
                     Eigen::MatrixXd & Vnew);
 
 #endif //INTRODUCTION_INFLATE_MUSCLE_H

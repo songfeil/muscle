@@ -9,31 +9,32 @@
 #include <vector>
 #include <set>
 
+//NEW ORGANIZATION
+
 void generate_muscle(const Eigen::MatrixXd & points,
                      const int num_points,
-                     const Eigen::MatrixXd & V,
-                     const Eigen::MatrixXi & F,
-                     const std::vector<Eigen::MatrixXi> & selected_faces,
-                     Eigen::MatrixXd & Vm,
-                     Eigen::MatrixXi & Fm,
-                     std::set<int> & fixed_vids);
-
-void generate_muscle_multiface(const Eigen::MatrixXd & points,
-                     const int num_points,
-                     const Eigen::MatrixXd & V,
-                     const Eigen::MatrixXi & F,
-                     const std::vector<Eigen::MatrixXi> & selected_faces,
                      Eigen::MatrixXd & Vm,
                      Eigen::MatrixXi & Fm);
 
-void generate_tendon(const Eigen::MatrixXd & points,
-                     const int num_points,
-                     const Eigen::MatrixXd & V,
-                     const Eigen::MatrixXi & F,
-                     const std::vector<Eigen::MatrixXi> & selected_faces,
-                     Eigen::MatrixXd & Vm,
-                     Eigen::MatrixXi & Fm,
-                     Eigen::MatrixXd & Vt,
-                     Eigen::MatrixXi & Ft);
+void attach_muscle( const Eigen::MatrixXd & V,
+                    const Eigen::MatrixXi & F,
+                    const std::vector<Eigen::MatrixXi> & selected_faces,
+                    Eigen::MatrixXd & Vm,
+                    Eigen::MatrixXi & Fm,
+                    std::set<int> & attached_vids);
+
+void attach_muscle_multiface( const Eigen::MatrixXd & V,
+                    const Eigen::MatrixXi & F,
+                    const std::vector<Eigen::MatrixXi> & selected_faces,
+                    Eigen::MatrixXd & Vm,
+                    Eigen::MatrixXi & Fm);
+
+void attach_tendon(const Eigen::MatrixXd & V,
+                    const Eigen::MatrixXi & F,
+                    const std::vector<Eigen::MatrixXi> & selected_faces,
+                    const Eigen::MatrixXd & Vm,
+                    const Eigen::MatrixXi & Fm,
+                    std::vector<Eigen::MatrixXd> & VV,
+                    std::vector<Eigen::MatrixXi> & FF);
 
 #endif //INTRODUCTION_GENERATE_MUSCLE_H

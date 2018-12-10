@@ -52,7 +52,7 @@ struct State
   // Muscle meshes
   Eigen::MatrixXd Vm;
   Eigen::MatrixXi Fm;
-  std::set<int> fixed_vids;
+  std::set<int> attached_vids;
   bool muscle_generated = false;
   // Total combination of all meshes to be displayed
   Eigen::MatrixXd V;
@@ -365,19 +365,31 @@ int main(int argc, char *argv[])
         mode = FACE_SELECT;
         break;
       }
+      case 't': {
+        // generate tendon
+        if (s.muscle_generated && (s.patch_faces.size() > 0)) {
+          Eigen::MatrixXd Vt;
+          Eigen::MatrixXi Ft;
+          attach_tendon(s.V, s.F, s.patch_faces, s.Vm, s.Fm, s.VV, s.FF);
+          s.patch_faces.clear();
+          update(true);
+        }
+        break;
+      }
+      case 'a': {
+          //attach_muscle_multiface(s.V, s.F, s.patch_faces, s.Vm, s.Fm);
+          attach_muscle(s.V, s.F, s.patch_faces, s.Vm, s.Fm, s.attached_vids);
+          s.patch_faces.clear();
+          update(true);
+        break;
+      }
       case 'G':
       case 'g':
       {
         // Generate muscle from points
         if (s.n_points > 2) { // Need some points to work with...
 
-         //generate_muscle(s.control_points, s.n_points, s.V, s.F, s.patch_faces, s.Vm, s.Fm, s.fixed_vids);
-          //  generate_muscle_multiface(s.control_points, s.n_points, s.V, s.F, s.patch_faces, s.Vm, s.Fm);
-          Eigen::MatrixXd Vt;
-          Eigen::MatrixXi Ft;
-         generate_tendon(s.control_points, s.n_points, s.V, s.F, s.patch_faces, s.Vm, s.Fm, Vt, Ft);
-         s.VV.push_back(Vt);
-         s.FF.push_back(Ft);
+          generate_muscle(s.control_points, s.n_points, s.Vm, s.Fm);
           s.control_points.resize(0, 3);
           s.n_points = 0;
           std::cout << "V rows" << s.Vm.rows() << std::endl;
@@ -394,7 +406,7 @@ int main(int argc, char *argv[])
           std::vector<int> vids;
           Eigen::Vector3d intersection;
           intersection_with_xy_plane(viewer, last_mouse, intersection);
-          xflate_verts_in_xrange(s.Vm, s.Fm, intersection(0), xflate_width, 1, s.fixed_vids, s.Vm);
+          xflate_verts_in_xrange(s.Vm, s.Fm, intersection(0), xflate_width, 1, s.Vm);
         } else {
           xflate_muscle(s.Vm, s.Fm, 0, s.Vm.rows(), 1, s.Vm);
         }
@@ -411,7 +423,7 @@ int main(int argc, char *argv[])
           std::vector<int> vids;
           Eigen::Vector3d intersection;
           intersection_with_xy_plane(viewer, last_mouse, intersection);
-          xflate_verts_in_xrange(s.Vm, s.Fm, intersection(0), xflate_width, -1, s.fixed_vids, s.Vm);
+          xflate_verts_in_xrange(s.Vm, s.Fm, intersection(0), xflate_width, -1, s.Vm);
         } else {
           xflate_muscle(s.Vm, s.Fm, 0, s.Vm.rows(), -1, s.Vm);
         }
