@@ -254,7 +254,29 @@ void generate_muscle_multiface(const Eigen::MatrixXd & points,
             Vmpatch1.row(i) = Vm.row(Vmidx[i]);
         }
 
-        Eigen::MatrixXd musVNew;
+        Eigen::MatrixXd musVNew = Vmpatch1;
+        Eigen::RowVector3d bonCenter = Vpatch1.colwise().mean();
+        Eigen::RowVector3d musCenter = Vmpatch1.colwise().mean();
+        Eigen::Vector3d t = bonCenter - musCenter;
+
+        // Perform simple translation along the direction from the center of muscle patch to bone
+        translate_V(musVNew, t);
+        int added = musVNew.rows();
+        for (int i = 0; i < added; i++) {
+            bb(cum_bnd + i) = Vmidx[i];
+        }
+
+        for (int i = 0; i < added; i++) {
+            Bonedest.row(cum_bnd + i) = musVNew.row(i);
+        }
+
+        for (int i = 0; i < added; i++) {
+            musclef.row(cum_bnd + i) = Vmpatch1.row(i);
+        }
+        cum_bnd = cum_bnd + added;
+
+        // Using move_patch
+        /*Eigen::MatrixXd musVNew;
         map_move_patch(Vmpatch1, Fmpatch1, Vpatch1, Fpatch1, musVNew);
 
         Eigen::VectorXi bnd;
@@ -279,7 +301,7 @@ void generate_muscle_multiface(const Eigen::MatrixXd & points,
         for (int i = 0; i < bnd.rows(); i++) {
             musclef.row(cum_bnd + i) = Vmpatch1.row(bnd(i));
         }
-        cum_bnd = cum_bnd + bnd.rows();
+        cum_bnd = cum_bnd + bnd.rows();*/
     }
     igl::ARAPData data;
     Eigen::VectorXi bbs = bb.segment(0, cum_bnd);
@@ -515,22 +537,19 @@ void interpolate_ellipse(
     long_axis.resize(npoints);
     short_axis.resize(npoints);
 
-    std::cout << "elipse ep print" << std::endl;
-    std::cout << ep.long_axis << std::endl;
-    std::cout << ep.long_dir << std::endl;
-    std::cout << ep.short_axis << std::endl;
-    std::cout << ep.short_dir << std::endl;
-    std::cout << ep.center << std::endl;
-    std::cout << ep.normal << std::endl;
+    // Try to fix a little bit
+    Eigen::Vector3d dir = epm.center - ep.center;
+    epm.center += 0.1 * dir;
+    ep.center += - 0.05 * dir;
 
     for (int i = 0; i < npoints; i++) {
         double t = (double) i/ (double) npoints;
         curve.row(i) = t * epm.center + (1-t) * ep.center;
-        normal.row(i) = t * epm.normal.transpose() + (1-t) * epm.normal.transpose();
-        long_dir.row(i) = t * epm.long_dir.transpose() + (1-t) * epm.long_dir.transpose();
-        short_dir.row(i) = t * epm.short_dir.transpose() + (1-t) * epm.short_dir.transpose();
-        long_axis(i) = t * epm.long_axis + (1-t) * ep.long_axis;
-        short_axis(i) = t * epm.short_axis + (1-t) * ep.short_axis;
+        normal.row(i) = t * epm.normal.transpose() + (1-t) * ep.normal.transpose();
+        long_dir.row(i) = t * epm.long_dir.transpose() + (1-t) * ep.long_dir.transpose();
+        short_dir.row(i) = t * epm.short_dir.transpose() + (1-t) * ep.short_dir.transpose();
+        long_axis(i) = (pow(t, 1) * epm.long_axis + (1-pow(t, 1)) * ep.long_axis) * (1.2*pow(t-0.5, 2) + 0.7 );
+        short_axis(i) = (pow(t, 1) * epm.short_axis + (1-pow(t, 1)) * ep.short_axis ) * (1.2*pow(t-0.5, 2) + 0.7 ) ;
     }
 }
 
@@ -546,7 +565,7 @@ void generate_tendon(const Eigen::MatrixXd & points,
     Eigen::MatrixXd p  = points.block(points.rows() - num_points, 0, num_points, 3);
     p.colwise().reverse();
     // Your code here to populate V and F
-    Eigen::MatrixXd Bc, Nc, pV, pN;
+    Eigen::MatrixXd Bc, Nc, pV, pN, Vm_before_smooth;
 //    bezier(p1, p2, p3, 50, Bc, Nc);
 //    bezier(p, num_points-1, 50, Bc, Nc);
     CatmullRomChain(p, 50, Bc, Nc);
@@ -555,6 +574,8 @@ void generate_tendon(const Eigen::MatrixXd & points,
     Eigen::MatrixXd All(pV.rows(), 6);
     All << pV, pN;
     poisson_surface_reconstruction(pV, pN, Vm, Fm);
+    // Smooth before doing any of the face-matching operations
+//    igl::per_vertex_attribute_smoothing(Vm_before_smooth, Fm, Vm);
 
     // Calculate average surface area of muscle mesh
     Eigen::MatrixXd dblA;
@@ -600,6 +621,7 @@ void generate_tendon(const Eigen::MatrixXd & points,
         // Determine the total number of faces on the muscle to be connected and
         // generate a muscle patch
         int sourcenum1 = ceil(area1 / avg_area);
+        std::cout << sourcenum1 <<std::endl;
         Eigen::MatrixXi closest1;
         get_closest_patch(Vm, Fm, sourcenum1, center1, closest1);
         std::cout<<"get closest patch m " <<std::endl;
@@ -627,7 +649,10 @@ void generate_tendon(const Eigen::MatrixXd & points,
         // Fill in the interpolated values and generate point cloud
         interpolate_ellipse(20, ep, epm, curve, normal, long_dir, short_dir, long_axis, short_axis);
         ellipse_along_curve(curve, normal, long_axis, long_dir, short_axis, short_dir, tendonV, tendonN);
-        poisson_surface_reconstruction(tendonV, tendonN, Vt, Ft);
+
+        Eigen::MatrixXd Vt_before_smooth;
+        poisson_surface_reconstruction(tendonV, tendonN, Vt_before_smooth, Ft);
+        igl::per_vertex_attribute_smoothing(Vt_before_smooth, Ft, Vt);
 
         Eigen::Vector3d t = Eigen::Vector3d::Ones() * 1;
         translate_V(Vmpatch1, t);

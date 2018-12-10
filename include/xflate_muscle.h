@@ -3,6 +3,7 @@
 
 #include <Eigen/Core>
 #include <set>
+#include <vector>
 
 void xflate_muscle(const Eigen::MatrixXd & V,
                     const Eigen::MatrixXi & F,
