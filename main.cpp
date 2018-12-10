@@ -50,6 +50,7 @@ struct State
   std::vector<Eigen::MatrixXd> VV; 
   std::vector<Eigen::MatrixXi> FF;
   // Muscle meshes
+  Eigen::MatrixXd Vm_original;
   Eigen::MatrixXd Vm;
   Eigen::MatrixXi Fm;
   std::set<int> attached_vids;
@@ -143,11 +144,13 @@ int main(int argc, char *argv[])
         viewer.data().set_mesh(s.V,s.F);
       }
       
-      // Reset color
+      // Reset colors
+      // Bones
       s.face_colors.resize(s.F.rows(), 3);
       for (int i = 0; i < s.F.rows() - n_Fm; i++) {
         s.face_colors.row(i) = white;
       }
+      // Muscle
       for (int i = s.F.rows() - n_Fm; i < s.F.rows(); i++ ){
         s.face_colors.row(i) = pink;
       }
@@ -449,7 +452,18 @@ int main(int argc, char *argv[])
       {
         push_undo(s);
         Eigen::MatrixXd V_smooth(s.Vm.rows(), 3);
+        Eigen::MatrixXd fixed_verts(s.attached_vids.size(), 3);
+        for (auto it = s.attached_vids.begin(); it != s.attached_vids.end(); ++it){
+          int vid = *it;
+          int curr = std::distance(s.attached_vids.begin(), it);
+          fixed_verts.row(curr) = s.Vm.row(vid);
+        }
         igl::per_vertex_attribute_smoothing(s.Vm, s.Fm, V_smooth);
+        for (auto it = s.attached_vids.begin(); it != s.attached_vids.end(); ++it){
+          int vid = *it;
+          int curr = std::distance(s.attached_vids.begin(), it);
+          V_smooth.row(vid) = fixed_verts.row(curr);
+        }
         s.Vm = V_smooth;
         update(true);
         break;

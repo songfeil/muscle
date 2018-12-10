@@ -140,6 +140,18 @@ void attach_muscle( const Eigen::MatrixXd & V,
     Eigen::MatrixXd Bonedest(selected_faces.size()*3, 3);
     Eigen::MatrixXd musclef(selected_faces.size()*3, 3);
 
+    // Matrices containing info on already fixed vertices
+    Eigen::VectorXi bb_fixed = Eigen::VectorXi(attached_vids.size());
+    Eigen::MatrixXd fixed_verts(attached_vids.size(), 3);
+
+    // Ensure to fix the already attached vertices before adding new attached vertices to the set
+    for (auto it = attached_vids.begin(); it != attached_vids.end(); ++it){
+        int vid = *it;
+        int curr = std::distance(attached_vids.begin(), it);
+        bb_fixed(curr) = vid;
+        fixed_verts.row(curr) = Vm.row(vid);
+    }
+
     for (auto it = selected_faces.begin(); it != selected_faces.end(); ++it) {
         int curr = std::distance(selected_faces.begin(), it);
         // Our current selected triangle on the bone
@@ -179,16 +191,34 @@ void attach_muscle( const Eigen::MatrixXd & V,
             }
         }
     }
-
+    
+    Eigen::VectorXi bb_all = Eigen::VectorXi(bb.rows() + bb_fixed.rows());
+    if (bb_fixed.rows() > 0){
+        std::cout << "boop1" << std::endl;
+        bb_all << bb, bb_fixed;
+        std::cout << bb_all << std::endl;
+    }
+    else {
+        std::cout << "boop2" << std::endl;
+        bb_all = bb;
+    }
     igl::ARAPData data;
-    igl::arap_precomputation(Vm, Fm, 3, bb, data);
+    igl::arap_precomputation(Vm, Fm, 3, bb_all, data);
     std::cout << "boop3" << std::endl;
     int ninterp = 10;
     for (int ni = 1; ni <= ninterp; ni++) {
         double t = double (ni) / double (ninterp);
         //std::cout<< (1-t)*Fcc + t*Bcc <<std::endl;
         Eigen::MatrixXd currdest = (1-t)*musclef + t*Bonedest;
-        igl::arap_solve(currdest, data, Vm);
+        Eigen::MatrixXd all_verts(currdest.rows() + fixed_verts.rows(), 3);
+        if (fixed_verts.rows() > 0) {
+            std::cout << "all verts"<< std::endl;
+            all_verts << currdest, fixed_verts;
+        }
+        else {
+            all_verts = currdest;
+        }
+        igl::arap_solve(all_verts, data, Vm);
     }    
     std::cout << "attach muscle?" << std::endl;                    
 }
@@ -353,7 +383,8 @@ void attach_tendon(const Eigen::MatrixXd & V,
                     const Eigen::MatrixXd & Vm,
                     const Eigen::MatrixXi & Fm,
                     std::vector<Eigen::MatrixXd> & VV,
-                    std::vector<Eigen::MatrixXi> & FF) {
+                    std::vector<Eigen::MatrixXi> & FF
+                    std::set<int> & attached_vids) {
 
     // Calculate average surface area of muscle mesh
     Eigen::MatrixXd Vt;

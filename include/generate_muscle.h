@@ -35,6 +35,7 @@ void attach_tendon(const Eigen::MatrixXd & V,
                     const Eigen::MatrixXd & Vm,
                     const Eigen::MatrixXi & Fm,
                     std::vector<Eigen::MatrixXd> & VV,
-                    std::vector<Eigen::MatrixXi> & FF);
+                    std::vector<Eigen::MatrixXi> & FF,
+                    std::set<int> & attached_vids);
 
 #endif //INTRODUCTION_GENERATE_MUSCLE_H

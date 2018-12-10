@@ -92,8 +92,8 @@ void volume_along_curve(const Eigen::MatrixXd & curve,
         Eigen::MatrixXd transform = Eigen::MatrixXd(3, 2);
         transform.col(0) = T;
         transform.col(1) = B;
-        std::cout << "Normal " << N << std::endl;
-        std::cout << transform << std::endl << std::endl;
+        // std::cout << "Normal " << N << std::endl;
+        // std::cout << transform << std::endl << std::endl;
 
         Eigen::MatrixXd scaleCircle2D = circle2D;
         Eigen::MatrixXd tCircle = (transform * scaleCircle2D.transpose()).transpose();
