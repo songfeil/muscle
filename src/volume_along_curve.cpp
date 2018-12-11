@@ -53,7 +53,6 @@ void volume_along_curve(const Eigen::MatrixXd & curve,
                         Eigen::MatrixXd & pointNormal){
 
     int n = curve.rows();
-    Eigen::VectorXd radii;
     // Fit radii of volume along gaussian distribution
     // Let's say that at it's widest, the radius should be a quarter as large as the curve is long
     // Find approximate length of the curve:
@@ -61,7 +60,6 @@ void volume_along_curve(const Eigen::MatrixXd & curve,
     for (int i = 1; i < curve.rows(); i++) {
         approx_length += (curve.row(i) - curve.row(i - 1)).norm();
     }
-    gaussian(n, approx_length / 4.0, approx_length, 2.0, radii);
     // Next we need to sample points in rings of radius r along the besier
     // Option 1) create a function for a circle on a plane perpendicular to the tangent and centered at each bezier-point with its corresopnding radius, sample along that
     // Option 2) find a vector of length r perpendicular to the tangent at each bezier-point, rotate it 360 degrees.
@@ -122,7 +120,6 @@ void ellipse_along_curve(const Eigen::MatrixXd & curve,
                          Eigen::MatrixXd & pointNormal){
 
     int n = curve.rows();
-    Eigen::VectorXd radii;
     // Fit radii of volume along gaussian distribution
     // Let's say that at it's widest, the radius should be a quarter as large as the curve is long
     // Find approximate length of the curve:
@@ -130,7 +127,6 @@ void ellipse_along_curve(const Eigen::MatrixXd & curve,
     for (int i = 1; i < curve.rows(); i++) {
         approx_length += (curve.row(i) - curve.row(i - 1)).norm();
     }
-    gaussian(n, approx_length / 4.0, approx_length, 2.0, radii);
     // Next we need to sample points in rings of radius r along the besier
     // Option 1) create a function for a circle on a plane perpendicular to the tangent and centered at each bezier-point with its corresopnding radius, sample along that
     // Option 2) find a vector of length r perpendicular to the tangent at each bezier-point, rotate it 360 degrees.
@@ -162,8 +158,8 @@ void ellipse_along_curve(const Eigen::MatrixXd & curve,
         Eigen::MatrixXd transform = Eigen::MatrixXd(3, 2);
         transform.col(0) =  long_dir.row(i).transpose(); // long axis
         transform.col(1) = short_dir.row(i).transpose(); // short axis
-        std::cout << "Normal " << N << std::endl;
-        std::cout << transform << std::endl << std::endl;
+        // std::cout << "Normal " << N << std::endl;
+        // std::cout << transform << std::endl << std::endl;
 
         Eigen::MatrixXd scaleCircle2D = circle2D;
         Eigen::MatrixXd tCircle = (transform * scaleCircle2D.transpose()).transpose();

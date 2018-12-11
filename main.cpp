@@ -121,7 +121,7 @@ int main(int argc, char *argv[])
   igl::read_triangle_mesh("../data/bone.obj",Vbone,Fbone);
   
   /* Define update functions for viewer */
-  const auto & update = [&](bool update_mesh)
+  const auto & update = [&]()
   {
       
     viewer.data().clear();
@@ -157,6 +157,7 @@ int main(int argc, char *argv[])
 
       // Color each patch differently
       int patch_num = 0;
+      std::cout << "coloring patches: " << s.patch_fids.size() << std::endl;
       for (const auto & patch : s.patch_fids) {
         int color = patch_num % 3;
         for (int fid : patch) {
@@ -164,8 +165,9 @@ int main(int argc, char *argv[])
         }
         patch_num++;
       }
-
+      std::cout << "break?" << std::endl;
       viewer.data().set_colors(s.face_colors);
+      std::cout << "break??" << std::endl;
     }
 
   };
@@ -192,7 +194,7 @@ int main(int argc, char *argv[])
 
           push_undo(s);
           add_face_to_patch(fid, s.F.row(fid), s.patch_faces, s.patch_fids);
-          update(true);
+          update();
           return true;
           
         }
@@ -230,7 +232,7 @@ int main(int argc, char *argv[])
 
           }
 
-          update(true);
+          update();
 
         }
 
@@ -243,7 +245,7 @@ int main(int argc, char *argv[])
           s.control_points.row(s.control_points.rows() - 1) = intersection;
           s.n_points++;
 
-          update(true);
+          update();
 
         }
       }
@@ -271,7 +273,7 @@ int main(int argc, char *argv[])
       s.VV.pop_back();
       s.VV.push_back(Vnew);
 
-      update(true);
+      update();
       return true;
     }
   
@@ -283,13 +285,11 @@ int main(int argc, char *argv[])
       // Continuous "sketching" input for muscle points
       if (mouse_down) {
 
-        push_undo(s);
-
         s.control_points.conservativeResize(s.control_points.rows() + 1, 3);
         s.control_points.row(s.control_points.rows() - 1) = intersection;
         s.n_points++;
 
-        update(true);
+        update();
         return true;
       }
 
@@ -348,9 +348,10 @@ int main(int argc, char *argv[])
       {
         // Muscle input mode
         if (mode == MUSCLE) { // click M again to clear? lol
+          push_undo(s);
           s.control_points.resize(0, 3);
           s.n_points = 0;
-          update(true);
+          update();
         } else {
           mode = MUSCLE;
         }
@@ -371,19 +372,37 @@ int main(int argc, char *argv[])
       case 't': {
         // generate tendon
         if (s.muscle_generated && (s.patch_faces.size() > 0)) {
+          push_undo(s);
+
           Eigen::MatrixXd Vt;
           Eigen::MatrixXi Ft;
           attach_tendon(s.V, s.F, s.patch_faces, s.Vm, s.Fm, s.VV, s.FF, s.attached_vids);
           s.patch_faces.clear();
-          update(true);
+          s.patch_fids.clear();
+          update();
         }
         break;
       }
       case 'a': {
-          //attach_muscle_multiface(s.V, s.F, s.patch_faces, s.Vm, s.Fm);
+        push_undo(s);
+
+        bool multiface = false;
+        for (const auto & patch : s.patch_faces) {
+          if (patch.rows() > 1) {
+            multiface = true;
+            break;
+          }
+        }
+        if (multiface) {
+          std::cout << "multiface" << std::endl;
+          attach_muscle_multiface(s.V, s.F, s.patch_faces, s.Vm, s.Fm, s.attached_vids);
+        } else {
+          std::cout << "singleface" << std::endl;
           attach_muscle(s.V, s.F, s.patch_faces, s.Vm, s.Fm, s.attached_vids);
-          s.patch_faces.clear();
-          update(true);
+        }
+        s.patch_faces.clear();
+        s.patch_fids.clear();
+        update();
         break;
       }
       case 'G':
@@ -391,61 +410,14 @@ int main(int argc, char *argv[])
       {
         // Generate muscle from points
         if (s.n_points > 2) { // Need some points to work with...
-
+          push_undo(s);
           generate_muscle(s.control_points, s.n_points, s.Vm, s.Fm);
           s.control_points.resize(0, 3);
           s.n_points = 0;
           std::cout << "V rows" << s.Vm.rows() << std::endl;
           s.muscle_generated = true;
-          update(true);
+          update();
         }
-        break;
-      }
-      case 'i':
-      {
-        push_undo(s);
-        // Inflate muscle mesh
-        if (mode == XFLATE) {
-          std::vector<int> vids;
-          Eigen::Vector3d intersection;
-          intersection_with_xy_plane(viewer, last_mouse, intersection);
-          xflate_verts_in_xrange(s.Vm, s.Fm, intersection(0), xflate_width, 1, s.Vm);
-        } else {
-          xflate_muscle(s.Vm, s.Fm, 0, s.Vm.rows(), 1, s.Vm);
-        }
-        
-        update(true);
-        break;
-      }
-      case 'd':
-      {
-        if (mode == XFLATE)
-        // Deflate muscle mesh
-        push_undo(s);
-        if (mode == XFLATE) {
-          std::vector<int> vids;
-          Eigen::Vector3d intersection;
-          intersection_with_xy_plane(viewer, last_mouse, intersection);
-          xflate_verts_in_xrange(s.Vm, s.Fm, intersection(0), xflate_width, -1, s.Vm);
-        } else {
-          xflate_muscle(s.Vm, s.Fm, 0, s.Vm.rows(), -1, s.Vm);
-        }
-        update(true);
-        break;
-      }
-      case 'x':
-      {
-        mode = XFLATE;
-        break;
-      }
-      case '>':
-      {
-        xflate_width += 0.1;
-        break;
-      }
-      case '<':
-      {
-        xflate_width -= 0.1;
         break;
       }
       case 's':
@@ -465,9 +437,55 @@ int main(int argc, char *argv[])
           V_smooth.row(vid) = fixed_verts.row(curr);
         }
         s.Vm = V_smooth;
-        update(true);
+        update();
         break;
       }
+    case 'i':
+    {
+      push_undo(s);
+      // Inflate muscle mesh
+      if (mode == XFLATE) {
+        std::vector<int> vids;
+        Eigen::Vector3d intersection;
+        intersection_with_xy_plane(viewer, last_mouse, intersection);
+        xflate_verts_in_xrange(s.Vm, s.Fm, intersection(0), xflate_width, 1, s.Vm);
+      } else {
+        xflate_muscle(s.Vm, s.Fm, 0, s.Vm.rows(), 1, s.Vm);
+      }
+      
+      update();
+      break;
+    }
+    case 'd':
+    {
+      // Deflate muscle mesh
+      push_undo(s);
+      if (mode == XFLATE) {
+        std::vector<int> vids;
+        Eigen::Vector3d intersection;
+        intersection_with_xy_plane(viewer, last_mouse, intersection);
+        xflate_verts_in_xrange(s.Vm, s.Fm, intersection(0), xflate_width, -1, s.Vm);
+      } else {
+        xflate_muscle(s.Vm, s.Fm, 0, s.Vm.rows(), -1, s.Vm);
+      }
+      update();
+      break;
+    }
+    case 'x':
+    {
+      mode = XFLATE;
+      break;
+    }
+    case '>':
+    {
+      xflate_width += 0.1;
+      break;
+    }
+    case '<':
+    {
+      xflate_width -= 0.1;
+      break;
+    }
       case 'w':
       {
         Eigen::MatrixXd empty;
@@ -491,7 +509,7 @@ int main(int argc, char *argv[])
     {
       std::cout << "undo/redo?" << std::endl;
       (mod & GLFW_MOD_SHIFT) ? redo() : undo();
-      update(true);
+      update();
       return true;
     }
     return false;

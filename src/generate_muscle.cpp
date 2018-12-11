@@ -225,7 +225,8 @@ void attach_muscle_multiface( const Eigen::MatrixXd & V,
                     const Eigen::MatrixXi & F,
                     const std::vector<Eigen::MatrixXi> & selected_faces,
                     Eigen::MatrixXd & Vm,
-                    Eigen::MatrixXi & Fm) {
+                    Eigen::MatrixXi & Fm,
+                    std::set<int> & attached_vids) {
 
     int large_num = 1000;
     Eigen::VectorXi bb = Eigen::VectorXi(large_num);
@@ -233,6 +234,18 @@ void attach_muscle_multiface( const Eigen::MatrixXd & V,
 
     Eigen::MatrixXd Bonedest(selected_faces.size()*3, 3);
     Eigen::MatrixXd musclef(selected_faces.size()*3, 3);
+
+    // Matrices containing info on already fixed vertices
+    Eigen::VectorXi bb_fixed = Eigen::VectorXi(attached_vids.size());
+    Eigen::MatrixXd fixed_verts(attached_vids.size(), 3);
+
+    // Ensure to fix the already attached vertices before adding new attached vertices to the set
+    for (auto it = attached_vids.begin(); it != attached_vids.end(); ++it){
+        int vid = *it;
+        int curr = std::distance(attached_vids.begin(), it);
+        bb_fixed(curr) = vid;
+        fixed_verts.row(curr) = Vm.row(vid);
+    }
 
     // Calculate average surface area of muscle mesh
     Eigen::MatrixXd dblA;
@@ -311,6 +324,15 @@ void attach_muscle_multiface( const Eigen::MatrixXd & V,
         int Vmidx[3*closest1.rows()];
         numdistinct = 0;
 
+        // Adding the vertices of the new muscle attachment points to our list
+        // So that future deformations ensure these vertices remain fixed
+        // std::cout << "collecting attached VIDS" << std::endl;
+        // for (int i = 0; i < closest1.rows(); i++) {
+        //     for (int j = 0; j < 3; j++) {
+        //         attached_vids.insert(closest1(i, j));
+        //     }
+        // }
+
         // Get the total number of distinct vertices
         std::set<int> sm1;
         for (int i = 0; i < closest1.rows(); i++) {
@@ -335,32 +357,34 @@ void attach_muscle_multiface( const Eigen::MatrixXd & V,
             Vmpatch1.row(i) = Vm.row(Vmidx[i]);
         }
 
-        Eigen::MatrixXd musVNew;
-        map_move_patch(Vmpatch1, Fmpatch1, Vpatch1, Fpatch1, musVNew);
+        Eigen::MatrixXd musVNew = Vmpatch1;
+        //map_move_patch(Vmpatch1, Fmpatch1, Vpatch1, Fpatch1, musVNew);
+        Eigen::Vector3d center_m = Vmpatch1.colwise().mean();
+        Eigen::Vector3d center_b = Vpatch1.colwise().mean();
+        translate_V(musVNew, center_b - center_m);
+        // Eigen::VectorXi bnd;
+        // igl::boundary_loop(Fmpatch1,bnd);
 
-        Eigen::VectorXi bnd;
-        igl::boundary_loop(Fmpatch1,bnd);
+        // Eigen::MatrixXd bnd_uv;
+        // igl::map_vertices_to_circle(Vmpatch1,bnd,bnd_uv);
 
-        Eigen::MatrixXd bnd_uv;
-        igl::map_vertices_to_circle(Vmpatch1,bnd,bnd_uv);
+        // Eigen::MatrixXd V_uv;
+        // igl::harmonic(Vmpatch1,Fmpatch1,bnd,bnd_uv,1,V_uv);
 
-        Eigen::MatrixXd V_uv;
-        igl::harmonic(Vmpatch1,Fmpatch1,bnd,bnd_uv,1,V_uv);
+        // std::cout << V_uv << std::endl;
 
-        std::cout << V_uv << std::endl;
-
-        for (int i = 0; i < bnd.rows(); i++) {
-            bb(cum_bnd + i) = Vmidx[bnd(i)];
+        for (int i = 0; i < musVNew.rows(); i++) {
+            bb(cum_bnd + i) = Vmidx[i];
         }
 
-        for (int i = 0; i < bnd.rows(); i++) {
-            Bonedest.row(cum_bnd + i) = musVNew.row(bnd(i));
+        for (int i = 0; i < musVNew.rows(); i++) {
+            Bonedest.row(cum_bnd + i) = musVNew.row(i);
         }
 
-        for (int i = 0; i < bnd.rows(); i++) {
-            musclef.row(cum_bnd + i) = Vmpatch1.row(bnd(i));
+        for (int i = 0; i < musVNew.rows(); i++) {
+            musclef.row(cum_bnd + i) = Vmpatch1.row(i);
         }
-        cum_bnd = cum_bnd + bnd.rows();
+        cum_bnd = cum_bnd + musVNew.rows();
     }
     igl::ARAPData data;
     Eigen::VectorXi bbs = bb.segment(0, cum_bnd);
@@ -436,7 +460,7 @@ void attach_tendon(const Eigen::MatrixXd & V,
         Eigen::MatrixXi closest1;
         get_closest_patch(Vm, Fm, sourcenum1, center1, closest1);
         std::cout<<"get closest patch m " <<std::endl;
-        Eigen::MatrixXi Fmpatch1;
+        Eigen::MatrixXi Fmpatch1; 
         Eigen::MatrixXd Vmpatch1;
         int Vmidx[Fm.rows()*3];
         std::cout<<closest1<<std::endl;
@@ -446,6 +470,15 @@ void attach_tendon(const Eigen::MatrixXd & V,
             closest_patch.row(i) = Fm.row(closest1(i));
         }
         construct_mesh(Vmidx, Vm, Fm, closest_patch, Vmpatch1, Fmpatch1);
+
+        // Adding the vertices of the new muscle attachment points to our list
+        // So that future deformations ensure these vertices remain fixed
+        std::cout << "collecting attached VIDS" << std::endl;
+        for (int i = 0; i < closest_patch.rows(); i++) {
+            for (int j = 0; j < 3; j++) {
+                attached_vids.insert(closest_patch(i, j));
+            }
+        }
 
         std::cout<<"construct mesh  " <<std::endl;
 

@@ -55,21 +55,56 @@ void xflate_verts_in_xrange(const Eigen::MatrixXd & V,
       Vnew.row(i) += N.row(i) * mode * 0.1 * coeff;
     }
   }
-
-  // igl::ARAPData data;
-  // Eigen::VectorXi fixed(s.fixed_vids.size());
-  // Eigen::MatrixXd V_smooth_fixed(s.fixed_vids.size(), 3);
-  // int i = 0;
-  // for (int ind : s.fixed_vids) {
-  //   V_smooth_fixed.row(i) = s.Vm.row(ind);
-  //   fixed(i) = ind;
-  //   i++;
-  // }
-  // std::cout << fixed << std::endl;
-  // igl::arap_precomputation(V_smooth, s.Fm, 3, fixed, data);
-  // igl::arap_solve(V_smooth_fixed, data, s.Vm);
-
 }
+
+// USAGE
+
+      // case 'i':
+      // {
+      //   push_undo(s);
+      //   // Inflate muscle mesh
+      //   if (mode == XFLATE) {
+      //     std::vector<int> vids;
+      //     Eigen::Vector3d intersection;
+      //     intersection_with_xy_plane(viewer, last_mouse, intersection);
+      //     xflate_verts_in_xrange(s.Vm, s.Fm, intersection(0), xflate_width, 1, s.Vm);
+      //   } else {
+      //     xflate_muscle(s.Vm, s.Fm, 0, s.Vm.rows(), 1, s.Vm);
+      //   }
+        
+      //   update(true);
+      //   break;
+      // }
+      // case 'd':
+      // {
+      //   // Deflate muscle mesh
+      //   push_undo(s);
+      //   if (mode == XFLATE) {
+      //     std::vector<int> vids;
+      //     Eigen::Vector3d intersection;
+      //     intersection_with_xy_plane(viewer, last_mouse, intersection);
+      //     xflate_verts_in_xrange(s.Vm, s.Fm, intersection(0), xflate_width, -1, s.Vm);
+      //   } else {
+      //     xflate_muscle(s.Vm, s.Fm, 0, s.Vm.rows(), -1, s.Vm);
+      //   }
+      //   update(true);
+      //   break;
+      // }
+      // case 'x':
+      // {
+      //   mode = XFLATE;
+      //   break;
+      // }
+      // case '>':
+      // {
+      //   xflate_width += 0.1;
+      //   break;
+      // }
+      // case '<':
+      // {
+      //   xflate_width -= 0.1;
+      //   break;
+      // }
 
 
  // EL TOPO BS

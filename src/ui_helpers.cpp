@@ -25,7 +25,10 @@ void add_face_to_patch( const int fid,
                         std::vector<Eigen::MatrixXi> & patches,
                         std::vector<std::vector<int>> & patch_fids) {
 
+    std::cout << "number of patches: " << patches.size() << std::endl;
+
     if (patches.size() > 0) {
+
         // If there are any existing patches to compare with,
         // Check if this face should be added to an existing patch
 

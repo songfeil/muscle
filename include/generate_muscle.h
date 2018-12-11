@@ -27,7 +27,8 @@ void attach_muscle_multiface( const Eigen::MatrixXd & V,
                     const Eigen::MatrixXi & F,
                     const std::vector<Eigen::MatrixXi> & selected_faces,
                     Eigen::MatrixXd & Vm,
-                    Eigen::MatrixXi & Fm);
+                    Eigen::MatrixXi & Fm,
+                    std::set<int> & attached_vids);
 
 void attach_tendon(const Eigen::MatrixXd & V,
                     const Eigen::MatrixXi & F,
