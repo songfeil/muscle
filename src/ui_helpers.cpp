@@ -25,8 +25,6 @@ void add_face_to_patch( const int fid,
                         std::vector<Eigen::MatrixXi> & patches,
                         std::vector<std::vector<int>> & patch_fids) {
 
-    std::cout << "number of patches: " << patches.size() << std::endl;
-
     if (patches.size() > 0) {
 
         // If there are any existing patches to compare with,
@@ -72,7 +70,6 @@ void add_face_to_patch( const int fid,
   patches.push_back(new_patch);
   patch_fids.push_back(new_patch_fids);
 
-  std::cout << "NEW PATCH: num patches is " << patches.size() << std::endl;
 }
 
 void verts_within_x_range(const double xmin,
@@ -82,7 +79,6 @@ void verts_within_x_range(const double xmin,
     double x;
     for (int i = 0; i < V.rows(); i++) {
         x = V(i, 0);
-        //std::cout << x << std::endl;
         
         if ((x < xmax) && (x > xmin)) {
             vids.push_back(i);

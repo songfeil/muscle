@@ -3,9 +3,6 @@
 #include <igl/unproject_onto_mesh.h>
 #include <igl/read_triangle_mesh.h>
 #include <igl/writeOBJ.h>
-#include <igl/adjacency_matrix.h>
-#include <igl/per_vertex_attribute_smoothing.h>
-#include <igl/arap.h>
 
 #include <Eigen/Geometry>
 #include <Eigen/Sparse>
@@ -19,7 +16,7 @@
 #include "ui_helpers.h"
 #include "generate_bone.h"
 #include "generate_muscle.h"
-#include "xflate_muscle.h"
+#include "mesh_editing.h"
 
 /* Input mode enum */
 enum Mode
@@ -40,7 +37,7 @@ const Eigen::RowVector3d white(1.0, 1.0, 1.0);
 const Eigen::RowVector3d pink(1.0,0.2,0.2);
 Eigen::RowVector3d patch_colors[3] = {yellow, red, blue};
 
-/* GLOBAL STATE :-) */
+/* STATE */
 
 // Undoable
 struct State
@@ -50,6 +47,7 @@ struct State
   std::vector<Eigen::MatrixXd> VV; 
   std::vector<Eigen::MatrixXi> FF;
   // Muscle meshes
+  // (Stored separately for muscle mesh editing purposes)
   Eigen::MatrixXd Vm_original;
   Eigen::MatrixXd Vm;
   Eigen::MatrixXi Fm;
@@ -89,7 +87,6 @@ int main(int argc, char *argv[])
   const auto push_undo = [&](State & _s=s)
   {
     undo_stack.push(_s);
-    // clear
     redo_stack = std::stack<State>();
   };
   const auto undo = [&]()
@@ -115,7 +112,19 @@ int main(int argc, char *argv[])
   igl::opengl::glfw::Viewer viewer;
   viewer.core.lighting_factor = 0.1;
   std::cout << "========= MUSCLE/BONE GENERATION =========" << std::endl;
-  std::cout << " B,b \t Bone input mode \n M,m \t Muscle input mode \n[space]  No mode (can drag around scene again)" << std::endl;
+  std::cout << " B,b \t Bone input mode"
+  "\n M,m \t Muscle input mode"
+  "\n F,f \t Face selection mode (select faces on bones) "
+  "\n A,a \t Attach muscle to selected faces on bone "
+  "\n T,t \t Generate tendons to attach muscle to selected faces on bone"
+  "\n"
+  "\n X,x \t Xflate muscle mode"
+  "\n I,i \t Inflate selected area in xflate mode"
+  "\n D,d \t Deflate selected area in xflate mode"
+  "\n >,< \t Increase or decrease selection area in xflate mode"
+  "\n S,s \t Smooth muscle"
+  "\n"
+  "\n[space]  No mode (can drag around scene again)" << std::endl;
 
   // Import our template bone mesh
   igl::read_triangle_mesh("../data/bone.obj",Vbone,Fbone);
@@ -123,14 +132,17 @@ int main(int argc, char *argv[])
   /* Define update functions for viewer */
   const auto & update = [&]()
   {
-      
+    
     viewer.data().clear();
     viewer.data().set_points(s.control_points, yellow);
 
+    // If we have meshes: 
     if (s.VV.size() > 0) {
       
-      // New mesh!
-      int n_Fm = 0;
+      int n_Fm = 0; // Number of faces in the muscle mesh
+
+      // If we have generated a muscle, combine with the other meshes for the viewer
+      // Otherwise, just combine the existing meshes
       if (s.muscle_generated){
         n_Fm = s.Fm.rows();
         s.VV.push_back(s.Vm);
@@ -144,8 +156,8 @@ int main(int argc, char *argv[])
         viewer.data().set_mesh(s.V,s.F);
       }
       
-      // Reset colors
-      // Bones
+      // Set colors
+      // Bones and tendons
       s.face_colors.resize(s.F.rows(), 3);
       for (int i = 0; i < s.F.rows() - n_Fm; i++) {
         s.face_colors.row(i) = white;
@@ -155,19 +167,17 @@ int main(int argc, char *argv[])
         s.face_colors.row(i) = pink;
       }
 
-      // Color each patch differently
+      // Color each user-selected patch differently
       int patch_num = 0;
-      std::cout << "coloring patches: " << s.patch_fids.size() << std::endl;
       for (const auto & patch : s.patch_fids) {
-        int color = patch_num % 3;
+        int color = patch_num % (sizeof(patch_colors)/sizeof(patch_colors[0]));
         for (int fid : patch) {
           s.face_colors.row(fid) = patch_colors[color];
         }
         patch_num++;
       }
-      std::cout << "break?" << std::endl;
+
       viewer.data().set_colors(s.face_colors);
-      std::cout << "break??" << std::endl;
     }
 
   };
@@ -184,7 +194,8 @@ int main(int argc, char *argv[])
 
       /* FACE_SELECT */
       if (mode == FACE_SELECT) {
-        // Ray cast to find closest face, color it.
+
+        // Ray cast to find closest face, select it.
         int fid;
         Eigen::Vector3f bary;
         Eigen::RowVector2f mouse;
@@ -201,7 +212,7 @@ int main(int argc, char *argv[])
 
       }
 
-      /* Point input modes */
+      /* The rest... */
       else {
         Eigen::Vector3d intersection;
         intersection_with_xy_plane(viewer, last_mouse, intersection);
@@ -221,6 +232,7 @@ int main(int argc, char *argv[])
             s.bp0 = intersection;
             bone_started = true;
           } 
+          
           // End of bone
           else {
 
@@ -285,6 +297,9 @@ int main(int argc, char *argv[])
       // Continuous "sketching" input for muscle points
       if (mouse_down) {
 
+        // Purposely not pushing undo here
+        // so that one "stroke" can be undone in one click
+
         s.control_points.conservativeResize(s.control_points.rows() + 1, 3);
         s.control_points.row(s.control_points.rows() - 1) = intersection;
         s.n_points++;
@@ -292,31 +307,27 @@ int main(int argc, char *argv[])
         update();
         return true;
       }
-
-      // // Hover existing point + click to delete
-      // else {
-
-      //   for (int i = 0; i < s.control_points.rows(); i++) {
-      //     auto p = s.control_points.row(i);
-      //     if ((intersection - p).norm() < viewer.data().point_size) {
-
-      //     }
-      //   }
-
-      // }
       
-    } else if (mode == XFLATE) {
+    } 
+
+    /* XFLATE */
+    else if (mode == XFLATE) {
+
+      // Project mouse
       Eigen::Vector3d intersection;
       intersection_with_xy_plane(viewer, last_mouse, intersection);
-      std::cout << intersection << std::endl;
+
+      // Get vertices on muscle within x range of mouse
       std::vector<int> vids;
       verts_within_x_range(intersection(0) - xflate_width, intersection(0) + xflate_width, s.Vm, vids);
-      std::cout << vids.size() << std::endl;
+
+      // Colour them (this should probably be moved into update...)
       Eigen::MatrixXd v_colors = Eigen::MatrixXd::Constant(s.V.rows(), 3, 0.3);
       int offset = s.V.rows() - s.Vm.rows();
       for (int v : vids) {
         v_colors.row(v + offset) = red;
       }
+
       viewer.data().set_colors(v_colors);
 
     }
@@ -336,156 +347,172 @@ int main(int argc, char *argv[])
     [&](igl::opengl::glfw::Viewer &, unsigned int key, int mod)
   {
     switch(key) {
+      /* BONE */
       case 'B':
       case 'b':
       {
-        // Bone input mode
         mode = BONE;
         break;
       }
+      /* MUSCLE */
       case 'M':
       case 'm':
       {
-        // Muscle input mode
-        if (mode == MUSCLE) { // click M again to clear? lol
-          push_undo(s);
-          s.control_points.resize(0, 3);
-          s.n_points = 0;
-          update();
-        } else {
-          mode = MUSCLE;
-        }
+        mode = MUSCLE;
         break;
       }
+      /* NONE */
       case ' ':
       {
-        // Panning/scene browsing
         mode = NONE;
+        update();
         break;
       }
+      /* FACE_SELECT */
       case 'f':
       {
-        // Face selecting mode
         mode = FACE_SELECT;
         break;
       }
+      /* Generate TENDON with selected faces */
       case 't': {
-        // generate tendon
+
         if (s.muscle_generated && (s.patch_faces.size() > 0)) {
           push_undo(s);
 
           Eigen::MatrixXd Vt;
           Eigen::MatrixXi Ft;
           attach_tendon(s.V, s.F, s.patch_faces, s.Vm, s.Fm, s.VV, s.FF, s.attached_vids);
+
+          // Clear selected patches now that they've been used
           s.patch_faces.clear();
           s.patch_fids.clear();
+
           update();
         }
-        break;
-      }
-      case 'a': {
-        push_undo(s);
 
-        bool multiface = false;
-        for (const auto & patch : s.patch_faces) {
-          if (patch.rows() > 1) {
-            multiface = true;
-            break;
-          }
-        }
-        if (multiface) {
-          std::cout << "multiface" << std::endl;
-          attach_muscle_multiface(s.V, s.F, s.patch_faces, s.Vm, s.Fm, s.attached_vids);
-        } else {
-          std::cout << "singleface" << std::endl;
-          attach_muscle(s.V, s.F, s.patch_faces, s.Vm, s.Fm, s.attached_vids);
-        }
-        s.patch_faces.clear();
-        s.patch_fids.clear();
-        update();
         break;
       }
+      /* Attach muscle to selected faces */
+      case 'a': {
+        if (s.muscle_generated && (s.patch_faces.size() > 0)) {
+
+          push_undo(s);
+
+          // Check if any of the patches are multiface
+          bool multiface = false;
+          for (const auto & patch : s.patch_faces) {
+            if (patch.rows() > 1) {
+              multiface = true;
+              break;
+            }
+          }
+
+          // If ANY of the patches are multiface, use multiface method
+          // Otherwise, use single face method
+          if (multiface) {
+            attach_muscle_multiface(s.V, s.F, s.patch_faces, s.Vm, s.Fm, s.attached_vids);
+          }
+          
+          else {
+            attach_muscle(s.V, s.F, s.patch_faces, s.Vm, s.Fm, s.attached_vids);
+          }
+
+          // Clear selected patches now that they've been used
+          s.patch_faces.clear();
+          s.patch_fids.clear();
+
+          update();
+
+        }
+
+        break;
+      }
+      /* Generate muscle from user input points */
       case 'G':
       case 'g':
       {
-        // Generate muscle from points
-        if (s.n_points > 2) { // Need some points to work with...
+
+        if (s.n_points > 5) { // Magic num: at least some number of points needed...
           push_undo(s);
           generate_muscle(s.control_points, s.n_points, s.Vm, s.Fm);
+
+          // Clear/update UI stuff now that it's been used
           s.control_points.resize(0, 3);
           s.n_points = 0;
-          std::cout << "V rows" << s.Vm.rows() << std::endl;
           s.muscle_generated = true;
+
           update();
         }
         break;
       }
+      /* Smooth the muscle mesh */
       case 's':
       {
+        if (s.muscle_generated) {
+          push_undo(s); 
+          Eigen::MatrixXd V_smooth(s.Vm.rows(), 3);
+          smooth_mesh_with_fixed(s.Vm, s.Fm, s.attached_vids, V_smooth);
+          s.Vm = V_smooth;
+          update();
+        }
+        break;
+      }
+      /* Inflate muscle mesh */
+      case 'i':
+      {
         push_undo(s);
-        Eigen::MatrixXd V_smooth(s.Vm.rows(), 3);
-        Eigen::MatrixXd fixed_verts(s.attached_vids.size(), 3);
-        for (auto it = s.attached_vids.begin(); it != s.attached_vids.end(); ++it){
-          int vid = *it;
-          int curr = std::distance(s.attached_vids.begin(), it);
-          fixed_verts.row(curr) = s.Vm.row(vid);
+        // If in the UI mode for inflation/deflation, only modify highlighted section
+        if (mode == XFLATE) {
+          std::vector<int> vids;
+          Eigen::Vector3d intersection;
+          intersection_with_xy_plane(viewer, last_mouse, intersection);
+          xflate_verts_in_xrange(s.Vm, s.Fm, intersection(0), xflate_width, 1, s.Vm);
+        } 
+        // Otherwise, inflate the whole mesh
+        else {
+          xflate_mesh(s.Vm, s.Fm, 0, s.Vm.rows(), 1, s.Vm);
         }
-        igl::per_vertex_attribute_smoothing(s.Vm, s.Fm, V_smooth);
-        for (auto it = s.attached_vids.begin(); it != s.attached_vids.end(); ++it){
-          int vid = *it;
-          int curr = std::distance(s.attached_vids.begin(), it);
-          V_smooth.row(vid) = fixed_verts.row(curr);
-        }
-        s.Vm = V_smooth;
+        
         update();
         break;
       }
-    case 'i':
-    {
-      push_undo(s);
-      // Inflate muscle mesh
-      if (mode == XFLATE) {
-        std::vector<int> vids;
-        Eigen::Vector3d intersection;
-        intersection_with_xy_plane(viewer, last_mouse, intersection);
-        xflate_verts_in_xrange(s.Vm, s.Fm, intersection(0), xflate_width, 1, s.Vm);
-      } else {
-        xflate_muscle(s.Vm, s.Fm, 0, s.Vm.rows(), 1, s.Vm);
+      /* Deflate muscle mesh */
+      case 'd':
+      {
+        push_undo(s);
+        // If in the UI mode for inflation/deflation, only modify highlighted section
+        if (mode == XFLATE) {
+          std::vector<int> vids;
+          Eigen::Vector3d intersection;
+          intersection_with_xy_plane(viewer, last_mouse, intersection);
+          xflate_verts_in_xrange(s.Vm, s.Fm, intersection(0), xflate_width, -1, s.Vm);
+        } 
+        // Otherwise, inflate the whole mesh
+        else {
+          xflate_mesh(s.Vm, s.Fm, 0, s.Vm.rows(), -1, s.Vm);
+        }
+        update();
+        break;
       }
-      
-      update();
-      break;
-    }
-    case 'd':
-    {
-      // Deflate muscle mesh
-      push_undo(s);
-      if (mode == XFLATE) {
-        std::vector<int> vids;
-        Eigen::Vector3d intersection;
-        intersection_with_xy_plane(viewer, last_mouse, intersection);
-        xflate_verts_in_xrange(s.Vm, s.Fm, intersection(0), xflate_width, -1, s.Vm);
-      } else {
-        xflate_muscle(s.Vm, s.Fm, 0, s.Vm.rows(), -1, s.Vm);
+      /* XFLATE (inflate or deflate) */
+      case 'x':
+      {
+        mode = XFLATE;
+        break;
       }
-      update();
-      break;
-    }
-    case 'x':
-    {
-      mode = XFLATE;
-      break;
-    }
-    case '>':
-    {
-      xflate_width += 0.1;
-      break;
-    }
-    case '<':
-    {
-      xflate_width -= 0.1;
-      break;
-    }
+      /* Width of xlfation selection */
+      case '>':
+      {
+        xflate_width += 0.1;
+        break;
+      }
+      case '<':
+      {
+        xflate_width -= 0.1;
+        break;
+      }
+      /* Output all meshes to obj file */
       case 'w':
       {
         Eigen::MatrixXd empty;
@@ -506,8 +533,7 @@ int main(int argc, char *argv[])
     [&](igl::opengl::glfw::Viewer &, unsigned char key, int mod)->bool
   {
     if(key == 'Z' && (mod & GLFW_MOD_SUPER))
-    {
-      std::cout << "undo/redo?" << std::endl;
+    { 
       (mod & GLFW_MOD_SHIFT) ? redo() : undo();
       update();
       return true;
