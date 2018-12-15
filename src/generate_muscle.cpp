@@ -324,7 +324,6 @@ void attach_muscle_multiface( const Eigen::MatrixXd & V,
 
         // Adding the vertices of the new muscle attachment points to our list
         // So that future deformations ensure these vertices remain fixed
-        // Todo: move to the point after deformation happens
         std::cout << "collecting attached VIDS" << std::endl;
         for (int i = 0; i < closest_patch.rows(); i++) {
             for (int j = 0; j < 3; j++) {
