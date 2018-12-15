@@ -21,6 +21,7 @@
 #include <move_patch.h>
 #include <PCA_elipse.h>
 #include <igl/per_vertex_attribute_smoothing.h>
+#include <igl/rotation_matrix_from_directions.h>
 
 void construct_mesh(int * Vidx, const Eigen::MatrixXd & V,
                     const Eigen::MatrixXi & F,
@@ -221,6 +222,22 @@ void attach_muscle( const Eigen::MatrixXd & V,
     std::cout << "attach muscle?" << std::endl;                    
 }
 
+void card2pol(Eigen::MatrixXd & PCAproj, Eigen::MatrixXd & PCApol) {
+    for (int i = 0; i < PCApol.rows(); i++) {
+        double r = PCAproj.row(i).norm();
+        PCApol(i, 1) = r;
+        if (r > 0) {
+            if (PCAproj(i, 1) > 0) {
+                PCApol(i, 0) = acos(PCAproj(i, 0) / r);
+            } else {
+                PCApol(i, 0) = 2*M_PI - acos(PCAproj(i, 0) / r);
+            }
+        } else {
+            PCApol(i, 0) = 0;
+        }
+    }
+}
+
 void attach_muscle_multiface( const Eigen::MatrixXd & V,
                     const Eigen::MatrixXi & F,
                     const std::vector<Eigen::MatrixXi> & selected_faces,
@@ -228,12 +245,10 @@ void attach_muscle_multiface( const Eigen::MatrixXd & V,
                     Eigen::MatrixXi & Fm,
                     std::set<int> & attached_vids) {
 
-    int large_num = 1000;
-    Eigen::VectorXi bb = Eigen::VectorXi(large_num);
-    int cum_bnd = 0;
-
-    Eigen::MatrixXd Bonedest(selected_faces.size()*3, 3);
-    Eigen::MatrixXd musclef(selected_faces.size()*3, 3);
+    int largenum = 10000;
+    Eigen::VectorXi bb = Eigen::VectorXi(largenum);
+    Eigen::MatrixXd Bonedest(largenum, 3);
+    Eigen::MatrixXd musclef(largenum, 3);
 
     // Matrices containing info on already fixed vertices
     Eigen::VectorXi bb_fixed = Eigen::VectorXi(attached_vids.size());
@@ -256,6 +271,7 @@ void attach_muscle_multiface( const Eigen::MatrixXd & V,
     }
     double avg_area = muscle_totalarea / dblA.rows();
 
+    int curr_num = 0;
 
     // Calculate area and center of attachment site 1 on bone
     // Also get the total number of distinct vertices in order
@@ -263,10 +279,12 @@ void attach_muscle_multiface( const Eigen::MatrixXd & V,
     for (auto it = selected_faces.begin(); it != selected_faces.end(); ++it) {
         Eigen::MatrixXi curr_patch = *it;
         double area1 = 0; double num1 = 0;
-        Eigen::MatrixXi Fpatch1(curr_patch.rows(), 3);
+        Eigen::MatrixXi Fpatch1;
+        Eigen::MatrixXd Vpatch1;
         int Vidx[3*curr_patch.rows()];
-        std::set<int> s1;
-        int numdistinct = 0;
+        construct_mesh(Vidx, V, F, curr_patch, Vpatch1, Fpatch1);
+
+        std::cout<<"construct mesh " <<std::endl;
         Eigen::RowVector3d center1 = Eigen::RowVector3d::Zero();
         int curr = std::distance(selected_faces.begin(), it);
 //        if (curr == 1) {
@@ -283,119 +301,276 @@ void attach_muscle_multiface( const Eigen::MatrixXd & V,
             double c = (V.row(triangle(2)) - V.row(triangle(0))).norm();
             double s = (a+b+c) / 2.;
             area1 += pow(s*(s-a)*(s-b)*(s-c), 0.5);
-
-            // Construct smaller mesh for the patch on bone
-            for (int j = 0; j < 3; j++) {
-                int fj = triangle(j);
-                auto result = s1.insert(fj);
-                if ( result.second ) {
-                    Vidx[numdistinct] = fj;
-                    Fpatch1(i, j) = numdistinct;
-                    numdistinct++;
-                } else {
-                    for (int k = 0; k < numdistinct; k++) {
-                        if (Vidx[k] == fj) {
-                            Fpatch1(i, j) = k;
-                        }
-                    }
-                }
-            }
-
         }
         center1 = 1./num1 * center1;
-        Eigen::MatrixXd Vpatch1(numdistinct, 3);
-        for (int i = 0; i < numdistinct; i++) {
-            Vpatch1.row(i) = V.row(Vidx[i]);
-        }
 
-        std::cout<< "bone patch vertices\n";
-        std::cout<< Vpatch1 << std::endl;
-
-        // Determine the total number of faces on the muscle to be deformed towards bone
+        // Determine the total number of faces on the muscle to be connected and
+        // generate a muscle patch
         int sourcenum1 = ceil(area1 / avg_area);
-        sourcenum1 = 1;
-        Eigen::MatrixXd lst_dist(Fm.rows(), 1);
-        triangle_hunt_lst(center1, Vm, Fm, lst_dist);
-        Eigen::MatrixXd sY, sIX;
-        igl::sort(lst_dist, 1, true, sY, sIX);
-
-        Eigen::MatrixXd closest1 = sIX.block(0, 0, sourcenum1, 1);
-        Eigen::MatrixXi Fmpatch1(closest1.rows(), 3);
-        int Vmidx[3*closest1.rows()];
-        numdistinct = 0;
+        std::cout << sourcenum1 <<std::endl;
+        Eigen::MatrixXi closest1;
+        get_closest_patch(Vm, Fm, sourcenum1, center1, closest1);
+        std::cout<<"get closest patch m " <<std::endl;
+        Eigen::MatrixXi Fmpatch1;
+        Eigen::MatrixXd Vmpatch1;
+        int Vmidx[Fm.rows()*3];
+        std::cout<<closest1<<std::endl;
+        Eigen::MatrixXi closest_patch(closest1.rows(), 3);
+        // igl slice
+        for (int i = 0; i < closest1.rows(); i++) {
+            closest_patch.row(i) = Fm.row(closest1(i));
+        }
+        construct_mesh(Vmidx, Vm, Fm, closest_patch, Vmpatch1, Fmpatch1);
 
         // Adding the vertices of the new muscle attachment points to our list
         // So that future deformations ensure these vertices remain fixed
-        // std::cout << "collecting attached VIDS" << std::endl;
-        // for (int i = 0; i < closest1.rows(); i++) {
-        //     for (int j = 0; j < 3; j++) {
-        //         attached_vids.insert(closest1(i, j));
-        //     }
-        // }
-
-        // Get the total number of distinct vertices
-        std::set<int> sm1;
-        for (int i = 0; i < closest1.rows(); i++) {
+        // Todo: move to the point after deformation happens
+        std::cout << "collecting attached VIDS" << std::endl;
+        for (int i = 0; i < closest_patch.rows(); i++) {
             for (int j = 0; j < 3; j++) {
-                int fj = Fm(closest1(i), j);
-                auto result = sm1.insert(fj);
-                if ( result.second ) {
-                    Vmidx[numdistinct] = fj;
-                    Fmpatch1(i, j) = numdistinct;
-                    numdistinct++;
-                } else {
-                    for (int k = 0; k < numdistinct; k++) {
-                        if (Vmidx[k] == fj) {
-                            Fmpatch1(i, j) = k;
+                attached_vids.insert(closest_patch(i, j));
+            }
+        }
+
+        struct elipse_param ep = PCA_param(Vpatch1, Fpatch1);
+        struct elipse_param epm = PCA_param(Vmpatch1, Fmpatch1);
+
+        // Project to PCA basis
+        ep.long_dir.normalize();
+        ep.short_dir.normalize();
+        ep.normal.normalize();
+        epm.long_dir.normalize();
+        epm.short_dir.normalize();
+        epm.normal.normalize();
+
+        // Calculate average normal of the patches and align the last principal
+        // direction to the average normal direction
+        Eigen::MatrixXd bonN, musN;
+        igl::per_face_normals(Vpatch1, Fpatch1, bonN);
+        igl::per_face_normals(Vmpatch1, Fmpatch1, musN);
+
+        // Average per face normal
+        Eigen::VectorXd avgbonN, avgmusN;
+        avgbonN = bonN.colwise().mean();
+        avgmusN = musN.colwise().mean();
+
+        Eigen::Vector3d bon_vecnormal = ep.normal.col(0);
+        Eigen::Vector3d mus_vecnormal = epm.normal.col(0);
+
+        // Flip the normal direction if needed
+        if (bon_vecnormal.dot(avgbonN) < 0) {
+            bon_vecnormal = - bon_vecnormal;
+        }
+        if (mus_vecnormal.dot(avgmusN) > 0) {
+            mus_vecnormal = - mus_vecnormal;
+        }
+
+        // Rotate the bone patch by aligning the patch normal to that of muscle patch
+        Eigen::Matrix3d rotation_mat = igl::rotation_matrix_from_directions(bon_vecnormal, mus_vecnormal);
+
+        std::cout << "rotation mat" <<std::endl;
+        std::cout << rotation_mat <<std::endl;
+        std::cout << rotation_mat * bon_vecnormal <<std::endl;
+
+        // Translate the bone patch center to the muscle patch center
+        Eigen::MatrixXd Vpatch1_centered(Vpatch1.rows(), 3);
+        for (int i = 0 ; i < Vpatch1.rows(); i++) {
+            Vpatch1_centered.row(i) = Vpatch1.row(i);
+        }
+        translate_V(Vpatch1_centered, -ep.center);
+        Eigen::MatrixXd Vmpatch1_centered(Vmpatch1.rows(), 3);
+        for (int i = 0 ; i < Vmpatch1.rows(); i++) {
+            Vmpatch1_centered.row(i) = Vmpatch1.row(i);
+        }
+        translate_V(Vmpatch1_centered, -epm.center);
+        Eigen::MatrixXd Vpatch1_trans = Vpatch1_centered * rotation_mat.transpose();
+
+        // Get right-hand sided standard coordinate system by fixing the directions of the PCA basis
+        if (mus_vecnormal.dot(epm.long_dir.cross(epm.short_dir)) < 0) {
+            epm.short_dir = -epm.short_dir;
+        }
+
+        // Project the patch points onto the plane spanned by the first two principal directions
+        Eigen::MatrixXd bonPCAproj(Vpatch1.rows(), 2);
+        Eigen::MatrixXd musPCAproj(Vmpatch1.rows(), 2);
+        bonPCAproj.col(0) = Vpatch1_trans * epm.long_dir;
+        bonPCAproj.col(1) = Vpatch1_trans * epm.short_dir;
+        musPCAproj.col(0) = Vmpatch1_centered * epm.long_dir;
+        musPCAproj.col(1) = Vmpatch1_centered * epm.short_dir;
+
+        // Transform to polar coordinates
+        Eigen::MatrixXd bonPCApol(Vpatch1.rows(), 2);
+        Eigen::MatrixXd musPCApol(Vmpatch1.rows(), 2);
+        card2pol(bonPCAproj, bonPCApol);
+        card2pol(musPCAproj, musPCApol);
+
+        // Get the parametrization of the patch points
+        Eigen::VectorXi bonBND;
+        igl::boundary_loop(Fpatch1,bonBND);
+        Eigen::MatrixXd bonbnd_uv;
+        igl::map_vertices_to_circle(Vmpatch1,bonBND,bonbnd_uv);
+        Eigen::MatrixXd bonV_uv;
+        igl::harmonic(Vpatch1,Fpatch1,bonBND,bonbnd_uv,1,bonV_uv);
+
+        // Flipping the connection matrix so that all normals are flipped
+        Eigen::MatrixXi Fmpatch1_flip(Fmpatch1.rows(), 3);
+        for (int i = 0; i < Fmpatch1.rows(); i++) {
+            Fmpatch1_flip(i, 2) = Fmpatch1(i, 0);
+            Fmpatch1_flip(i, 1) = Fmpatch1(i, 1);
+            Fmpatch1_flip(i, 0) = Fmpatch1(i, 2);
+        }
+
+        Eigen::VectorXi musBND;
+        igl::boundary_loop(Fmpatch1_flip,musBND);
+        Eigen::MatrixXd musbnd_uv;
+        igl::map_vertices_to_circle(Vmpatch1,musBND,musbnd_uv);
+        Eigen::MatrixXd musV_uv;
+        igl::harmonic(Vmpatch1,Fmpatch1_flip,musBND,musbnd_uv,1,musV_uv);
+
+        // Transform to polar coordinate system
+        Eigen::MatrixXd bonV_uvpol(Vpatch1.rows(), 2);
+        Eigen::MatrixXd musV_uvpol(Vmpatch1.rows(), 2);
+        card2pol(bonV_uv, bonV_uvpol);
+        card2pol(musV_uv, musV_uvpol);
+
+        // Find the optimal rotation angle to align project on PCA and parametrization
+        // by minimizing (thetaproj - (thetaparam + t)) ^ 2. Note thetaproj - thetaparam
+        // should be the angle between the projection point and parametrization point
+        Eigen::MatrixXd bonmeanuvpol = bonV_uvpol.colwise().mean();
+        Eigen::MatrixXd musmeanuvpol = musV_uvpol.colwise().mean();
+        double t_bon_uv = bonmeanuvpol(0);
+        double t_mus_uv = musmeanuvpol(0);
+
+        Eigen::MatrixXd bonmeanPCApol = bonPCApol.colwise().mean();
+        Eigen::MatrixXd musmeanPCApol = musPCApol.colwise().mean();
+
+        double t_bon_PCA = 0;
+        double t_mus_PCA = 0;
+
+        double t_bon = 0;
+        double t_mus = 0;
+        for (int i = 0; i < bonV_uvpol.rows(); i++) {
+            double thetaproj = bonPCApol(i, 0);
+            double thetaparam = bonV_uvpol(i, 0);
+            double diff = thetaproj - thetaparam;
+            if (diff < 0) {
+                // Thetaproj and thetaparam crosses angle zero
+                diff += 2*M_PI;
+            }
+            if (diff > M_PI) {
+                diff = diff - 2*M_PI;
+            }
+            t_bon += diff;
+        }
+        // Minimizer for bone patch
+        t_bon = t_bon / bonV_uvpol.rows();
+        for (int i = 0; i < musV_uvpol.rows(); i++) {
+            double thetaproj = musPCApol(i, 0);
+            double thetaparam = musV_uvpol(i, 0);
+            double diff = thetaproj - thetaparam;
+            if (diff < 0) {
+                // Thetaproj and thetaparam crosses angle zero
+                diff += 2*M_PI;
+            }
+            if (diff > M_PI) {
+                diff = diff - 2*M_PI;
+            }
+            t_mus += diff;
+        }
+        // Minimizer for bone patch
+        t_mus = t_mus / musV_uvpol.rows();
+
+        for (int i = 0; i < bonV_uvpol.rows(); i++) {
+            bonV_uvpol(i, 0) += t_bon;
+            if (bonV_uvpol(i, 0) < 0) {
+                bonV_uvpol(i, 0) += 2*M_PI;
+            }
+            if (bonV_uvpol(i, 0) > 2*M_PI) {
+                bonV_uvpol(i, 0) -= 2*M_PI;
+            }
+        }
+        for (int i = 0; i < musV_uvpol.rows(); i++) {
+            musV_uvpol(i, 0) += t_mus;
+            if (musV_uvpol(i, 0) < 0) {
+                musV_uvpol(i, 0) += 2*M_PI;
+            }
+
+            if (musV_uvpol(i, 0) > 2*M_PI) {
+                musV_uvpol(i, 0) -= 2*M_PI;
+            }
+        }
+
+        // Align boundary points on the muscle patch to the boundary points on the bone patch
+        Eigen::MatrixXd musVNew(musBND.rows(), 3);
+        for (int i = 0; i < musBND.rows(); i++) {
+            bool found = false;
+            for (int j = 0; j < bonBND.rows(); j++) {
+                double bontheta0 = bonV_uvpol(bonBND(j), 0);
+                double bontheta1 = bonV_uvpol(bonBND((j+1)%bonBND.rows()), 0);
+                double mustheta  = musV_uvpol(musBND(i), 0);
+                bool in = false;
+                if (bontheta1 < bontheta0) {
+                    bontheta1 += 2*M_PI;
+                    if (mustheta >= bontheta0) {
+                        in = true;
+                    } else {
+                        mustheta += 2*M_PI;
+                        if (mustheta <= bontheta1) {
+                            in = true;
                         }
                     }
+                } else {
+                    if ( bontheta0 <= mustheta && bontheta1 > mustheta) {
+                        in = true;
+                    }
+                }
+
+                if ( in ) {
+                    found = true;
+                    double t = (mustheta - bontheta0) / (bontheta1 - bontheta0);
+                    musVNew.row(i) = t * Vpatch1.row(bonBND((j+1)%bonBND.rows())) + (1-t) * Vpatch1.row(bonBND(j));
+                    break;
                 }
             }
         }
-        Eigen::MatrixXd Vmpatch1(numdistinct, 3);
-        for (int i = 0; i < numdistinct; i++) {
-            Vmpatch1.row(i) = Vm.row(Vmidx[i]);
+
+        // Record the destination points of the muscle patch for deformation
+        for (int i = 0; i < musBND.rows(); i++) {
+            bb(curr_num +i) = Vmidx[musBND(i)];
         }
-
-        Eigen::MatrixXd musVNew = Vmpatch1;
-        //map_move_patch(Vmpatch1, Fmpatch1, Vpatch1, Fpatch1, musVNew);
-        Eigen::Vector3d center_m = Vmpatch1.colwise().mean();
-        Eigen::Vector3d center_b = Vpatch1.colwise().mean();
-        translate_V(musVNew, center_b - center_m);
-        // Eigen::VectorXi bnd;
-        // igl::boundary_loop(Fmpatch1,bnd);
-
-        // Eigen::MatrixXd bnd_uv;
-        // igl::map_vertices_to_circle(Vmpatch1,bnd,bnd_uv);
-
-        // Eigen::MatrixXd V_uv;
-        // igl::harmonic(Vmpatch1,Fmpatch1,bnd,bnd_uv,1,V_uv);
-
-        // std::cout << V_uv << std::endl;
-
-        for (int i = 0; i < musVNew.rows(); i++) {
-            bb(cum_bnd + i) = Vmidx[i];
+        for (int i = 0; i < musBND.rows(); i++) {
+            Bonedest.row(curr_num +i) = musVNew.row(i);
         }
-
-        for (int i = 0; i < musVNew.rows(); i++) {
-            Bonedest.row(cum_bnd + i) = musVNew.row(i);
+        for (int i = 0; i < musBND.rows(); i++) {
+            musclef.row(curr_num +i) = Vmpatch1.row(musBND(i));
         }
+        curr_num += musBND.rows();
 
-        for (int i = 0; i < musVNew.rows(); i++) {
-            musclef.row(cum_bnd + i) = Vmpatch1.row(i);
-        }
-        cum_bnd = cum_bnd + musVNew.rows();
+    }
+
+    Eigen::VectorXi bb_all = Eigen::VectorXi(bb.rows() + bb_fixed.rows());
+    if (bb_fixed.rows() > 0){
+        bb_all << bb.segment(0, curr_num), bb_fixed;
+        std::cout << bb_all << std::endl;
+    }
+    else {
+        bb_all = bb.segment(0, curr_num);
     }
     igl::ARAPData data;
-    Eigen::VectorXi bbs = bb.segment(0, cum_bnd);
-    igl::arap_precomputation(Vm, Fm, 3, bbs, data);
-    //int ninterp = 10;
+    igl::arap_precomputation(Vm, Fm, 3, bb_all, data);
     int ninterp = 10;
     for (int ni = 1; ni <= ninterp; ni++) {
         double t = double (ni) / double (ninterp);
         //std::cout<< (1-t)*Fcc + t*Bcc <<std::endl;
-        Eigen::MatrixXd currdest = (1-t)*musclef.block(0, 0, cum_bnd, 3) + t*Bonedest.block(0, 0, cum_bnd, 3);
-        igl::arap_solve(currdest, data, Vm);
+        Eigen::MatrixXd currdest = (1-t)*musclef.block(0, 0, curr_num ,3) + t*Bonedest.block(0, 0, curr_num ,3);
+        Eigen::MatrixXd all_verts(currdest.rows() + fixed_verts.rows(), 3);
+        if (fixed_verts.rows() > 0) {
+            all_verts << currdest, fixed_verts;
+        }
+        else {
+            all_verts = currdest;
+        }
+        igl::arap_solve(all_verts, data, Vm);
     }
 }
 
