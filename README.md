@@ -37,7 +37,20 @@ An overview of each header file, documenting each function.
 
 #### PCA_elipse.h
 - PCA_param
-    - Given a patch mesh, fit an ellipse using PCA. Output the parametrizations defining an ellipse including short/long axis length, short/long axis direction, center of the ellipse and normal of the ellipse plane.
+    - Given a patch mesh, fit an ellipse using PCA. Output the parameters defining an ellipse including short/long axis length, short/long axis direction, center of the ellipse and normal of the ellipse plane.
+
+#### volume_along_curve.h
+- volume_along_curve
+    - Given points along a curve, genereate point clouds and normals from circles around the curve for the purpose of Poisson Surface Reconstruction.
+- ellipse_along_curve
+    - Given points and other interpolated ellipse parameters along a curve, genereate point clouds and normals from ellipses around the curve for the purpose of Poisson Surface Reconstruction.
+
+#### triangle_hunt.h
+- triangle_hunts
+    - Given a surface mesh and a query point, find out the closest face on the mesh from the query point.
+
+- triangle_hunt_lst
+    - Given a surface mesh and a query point, return a sorted list of the distances of faces on the mesh from the query point.
 
 ### User Input
 
