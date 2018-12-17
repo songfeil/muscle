@@ -21,7 +21,23 @@ An overview of each header file, documenting each function.
 
 ### Muscle and Tendon Generation
 
-...
+#### generate_muscle.h
+- generate_muslce
+    - Given control points, generate Catmull Rom Spline curve, sample points for Poisson Surface Reconstruction and smooth the generated muscle mesh
+- attach_muscle
+    - Given the whole muscle mesh and selected bone faces, perform single-face attachment from muscle to each desired attachment sites on bone using ARAP deformation
+- attach_muscle_multiface
+    - Given the whole muscle mesh and selected bone faces, perform multi-face attachment from muscle to each desired attachment sites on bone using ARAP deformation
+- attach_tendon
+    - Given the whole muscle mesh and selected bone faces, generate tendon mesh connecting the muscle and the desired attachment sites on bone.
+    
+#### poisson_surface_reconstruction.h
+- poisson_surface_reconstruction
+    - Takes input sample points P and input normals N and gives a watertight mesh using a simplified version of [Kazhdan et. al 2006]
+
+#### PCA_elipse.h
+- PCA_param
+    - Given a patch mesh, fit an ellipse using PCA. Output the parametrizations defining an ellipse including short/long axis length, short/long axis direction, center of the ellipse and normal of the ellipse plane.
 
 ### User Input
 
