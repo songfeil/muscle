@@ -1,39 +1,5 @@
 # Geometry Processing – Muscle Mesh Project
 
-> **To get started:** Fork this repository then issue
-> 
->     git clone --recursive http://github.com/[username]/geometry-processing-introduction.git
->
-
-## Prerequisite installation
-
-On all platforms, we will assume you have installed cmake and a modern c++
-compiler on Mac OS X[¹](#¹macusers), Linux[²](#²linuxusers), or
-Windows[³](#³windowsusers).
-
-We also assume that you have cloned this repository using the `--recursive`
-flag (if not then issue `git submodule update --init --recursive`). 
-
-## Layout
-
-    README.md
-    CMakeLists.txt
-    main.cpp
-    include/
-      function1.h
-      function2.h
-      ...
-    src/
-      function1.cpp
-      function2.cpp
-      ...
-    shared/
-      libigl/
-        include/
-          igl/
-            ...
-      ...
-
 ## Compilation
 
 Starting in this directory, issue:
@@ -47,4 +13,42 @@ Starting in this directory, issue:
 
 Once built, you can execute the program from inside the `build/` using 
 
-    ./introduction
+    ./muscle
+    
+## Documentation
+
+An overview of each header file, documenting each function.
+
+### Muscle and Tendon Generation
+
+...
+
+### User Input
+
+Much of the user interface functionality was directly coded into the main.cpp file, however some repeatedly used or more complex chunks of code were wrapped into their own functions and files.
+
+#### ui_helpers.h
+A variety of functions that are used for user-input.
+
+- intersection_with_xy_plane
+    - User input currently defaults to the xy plane for simplification in 3D-- this function returns an intersection point in 3D using raycasting.
+- add_face_to_patch
+    - Used to select faces on the bone mesh, and group them into "patches" if they share an edge (at the time the face is selected).
+- verts_within_x_range
+    - Used for the experimental inflation/deflation mode, highlights vertices within the x-range of some point (the cursor)
+
+#### mesh_editing.h
+- xflate_mesh
+    - Either inflate or deflate a whole given mesh, by moving all vertices in the direction of the normal.
+- xflate_verts
+    - Either inflate or deflate only a subset of vertices on a mesh.
+- xflate_verts_in_xrange
+    - Either inflate or deflate verts within the x-range of a given point.
+- smooth_mesh_with_fixed
+    - Smooth mesh but pin fixed verts back into place (work-around of non-volume-preserving smoothing)
+
+#### generate_bone.h
+- start_flinstone_bone
+    - Given a point, generate new "flinstone bone" mesh with one end pinned to that point.
+- transform_flinstone_bone
+    - Given a start point and an end point, transform a given "flinstone bone" mesh lengthwise along the vector between the points
