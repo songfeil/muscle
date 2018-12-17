@@ -45,6 +45,6 @@ Starting in this directory, issue:
 
 ## Execution
 
-Once built, you can execute the assignment from inside the `build/` using 
+Once built, you can execute the program from inside the `build/` using 
 
     ./introduction
