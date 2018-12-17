@@ -7,6 +7,9 @@
 #include <igl/opengl/glfw/Viewer.h>
 #include <vector>
 
+void prune_input_stroke(const double thresh,
+                        Eigen::MatrixXd & points);
+
 void intersection_with_xy_plane( const igl::opengl::glfw::Viewer & viewer,
                                  const Eigen::Vector3d & last_mouse,
                                  Eigen::Vector3d & intersection );

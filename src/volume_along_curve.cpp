@@ -1,5 +1,4 @@
 #include "volume_along_curve.h"
-#include "gaussian.h"
 #include <Eigen/Geometry>
 #include <iostream>
 #include <functional>

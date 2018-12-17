@@ -48,7 +48,6 @@ struct State
   std::vector<Eigen::MatrixXi> FF;
   // Muscle meshes
   // (Stored separately for muscle mesh editing purposes)
-  Eigen::MatrixXd Vm_original;
   Eigen::MatrixXd Vm;
   Eigen::MatrixXi Fm;
   std::set<int> attached_vids;
@@ -136,24 +135,27 @@ int main(int argc, char *argv[])
     viewer.data().clear();
     viewer.data().set_points(s.control_points, yellow);
 
-    // If we have meshes: 
-    if (s.VV.size() > 0) {
-      
-      int n_Fm = 0; // Number of faces in the muscle mesh
+    int n_Fm = 0;
 
-      // If we have generated a muscle, combine with the other meshes for the viewer
-      // Otherwise, just combine the existing meshes
-      if (s.muscle_generated){
+    if (s.muscle_generated){
         n_Fm = s.Fm.rows();
         s.VV.push_back(s.Vm);
         s.FF.push_back(s.Fm);
-        igl::combine(s.VV,s.FF,s.V,s.F);
-        viewer.data().set_mesh(s.V,s.F);
+    }
+
+    // If we have meshes: 
+    if (s.VV.size() > 0) {
+      
+       // Number of faces in the muscle mesh
+
+      // If we have generated a muscle, combine with the other meshes for the viewer
+      // Otherwise, just combine the existing meshes
+      igl::combine(s.VV,s.FF,s.V,s.F);
+      viewer.data().set_mesh(s.V,s.F);
+
+      if (s.muscle_generated){
         s.VV.pop_back();
         s.FF.pop_back();
-      } else {
-        igl::combine(s.VV,s.FF,s.V,s.F);
-        viewer.data().set_mesh(s.V,s.F);
       }
       
       // Set colors
@@ -511,6 +513,12 @@ int main(int argc, char *argv[])
       {
         xflate_width -= 0.1;
         break;
+      }
+      case 'p':
+      {
+        //prune input
+        prune_input_stroke(0.25, s.control_points);
+        update();
       }
       /* Output all meshes to obj file */
       case 'w':

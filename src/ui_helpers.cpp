@@ -1,6 +1,28 @@
 #include "ui_helpers.h"
 #include <igl/unproject_ray.h>
 
+void prune_input_stroke(const double thresh,
+                        Eigen::MatrixXd & points) {
+    Eigen::MatrixXd pruned(points.rows(), 3);
+    pruned.row(0) = points.row(0);
+    Eigen::Vector3d point1 = points.row(0);
+    Eigen::Vector3d point2;
+    int i = 1;
+    int n = 1;
+    while (i < points.rows()) {
+        point2 = points.row(i);
+        if ((point1 - point2).norm() > thresh) {
+            pruned.row(n) = point2;
+            point1 = point2;
+            n++;
+        }
+        i++;
+    }
+    pruned.conservativeResize(n + 1, 3);
+    points = pruned;
+
+}
+
 void ray_intersect_plane(const Eigen::Vector3d &p0,
                          const Eigen::Vector3d &n,
                          const Eigen::Vector3d &source,
