@@ -48,3 +48,31 @@ Starting in this directory, issue:
 Once built, you can execute the program from inside the `build/` using 
 
     ./introduction
+    
+## Documentation
+
+An overview of each header file, documenting each function.
+
+### Muscle and Tendon Generation
+
+- bezier.h
+- poisson_surface_reconstruction.h
+- (all the other code
+
+### User Input
+
+Much of the user interface functionality was directly coded into the main.cpp file, however some repeatedly used or more complex chunks of code were wrapped into their own functions and files.
+
+#### ui_helpers.h
+A variety of functions that are used for user-input.
+
+- intersection_with_xy_plane()
+    - User input currently defaults to the xy plane for simplification in 3D-- this function returns an intersection point in 3D using raycasting.
+- add_face_to_patch()
+    - Used to select faces on the bone mesh, and group them into "patches" if they share an edge.
+- verts_within_x_range()
+    - Used for the experimental inflation/deflation mode, highlights vertices within the x-range of some point (the cursor)
+
+#### mesh_editing.h
+
+#### generate_bone.h
