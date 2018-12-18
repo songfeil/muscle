@@ -21,6 +21,10 @@ An overview of each header file, documenting each function.
 
 ### Muscle and Tendon Generation
 
+#### control_curve.h
+- CatmullRomChain
+    - Generate a Catmull Rom Spline curve given the control points and output sample points along the curve as well as their respective tangents
+
 #### generate_muscle.h
 - generate_muslce
     - Given control points, generate Catmull Rom Spline curve, sample points for Poisson Surface Reconstruction and smooth the generated muscle mesh
@@ -31,11 +35,11 @@ An overview of each header file, documenting each function.
 - attach_tendon
     - Given the whole muscle mesh and selected bone faces, generate tendon mesh connecting the muscle and the desired attachment sites on bone.
     
-#### poisson_surface_reconstruction.h
-- poisson_surface_reconstruction
+#### poisson_surface_reconstruction.h, fd_grad.h, fd_interpolate.h, fd_partial_derivative.h
+- poisson_surface_reconstruction and other helper functions
     - Takes input sample points P and input normals N and gives a watertight mesh using a simplified version of [Kazhdan et. al 2006]
 
-#### PCA_elipse.h
+#### PCA_ellipse.h
 - PCA_param
     - Given a patch mesh, fit an ellipse using PCA. Output the parameters defining an ellipse including short/long axis length, short/long axis direction, center of the ellipse and normal of the ellipse plane.
 
@@ -46,7 +50,7 @@ An overview of each header file, documenting each function.
     - Given points and other interpolated ellipse parameters along a curve, genereate point clouds and normals from ellipses around the curve for the purpose of Poisson Surface Reconstruction.
 
 #### triangle_hunt.h
-- triangle_hunts
+- triangle_hunt
     - Given a surface mesh and a query point, find out the closest face on the mesh from the query point.
 
 - triangle_hunt_lst
