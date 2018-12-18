@@ -18,10 +18,16 @@
 #include <igl/sort.h>
 #include <set>
 #include <vector>
-#include <move_patch.h>
 #include <PCA_ellipse.h>
 #include <igl/per_vertex_attribute_smoothing.h>
 #include <igl/rotation_matrix_from_directions.h>
+
+// Translate vertices V by vector t
+void translate_V(Eigen::MatrixXd & V, const Eigen::Vector3d & t) {
+    for (int i = 0; i < V.rows(); i++) {
+        V.row(i) += t.transpose();
+    }
+}
 
 // Construct patch mesh originally coming from a larger mesh,
 // with all indices into V, F converted to local indexing

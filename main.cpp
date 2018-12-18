@@ -122,6 +122,7 @@ int main(int argc, char *argv[])
   "\n D,d \t Deflate selected area in xflate mode"
   "\n >,< \t Increase or decrease selection area in xflate mode"
   "\n S,s \t Smooth muscle"
+  "\n G,g \t Generate muscle"
   "\n"
   "\n[space]  No mode (can drag around scene again)" << std::endl;
 
