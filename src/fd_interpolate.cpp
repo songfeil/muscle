@@ -22,14 +22,14 @@ void fd_interpolate(
   // Loop through rows of P (loop through points)
   for (int i = 0; i < P.rows(); i++) {
     // Find the nearest points
-    int x = (int) ((P(i, 0) - corner[0]) / h);
-    int y = (int) ((P(i, 1) - corner[1]) / h);
-    int z = (int) ((P(i, 2) - corner[2]) / h);
+    int x = (int) ((P(i, 0) - corner(0)) / h);
+    int y = (int) ((P(i, 1) - corner(1)) / h);
+    int z = (int) ((P(i, 2) - corner(2)) / h);
 
     // Find percent
-    double px = (P(i, 0) - corner[0]) / h - x;
-    double py = (P(i, 1) - corner[1]) / h - y;
-    double pz = (P(i, 2) - corner[2]) / h - z;
+    double px = (P(i, 0) - corner(0)) / h - x;
+    double py = (P(i, 1) - corner(1)) / h - y;
+    double pz = (P(i, 2) - corner(2)) / h - z;
 
     tripletList.push_back(Eigen::Triplet<double> (i, ind(x, y, z), (1 - px) * (1 - py) * (1 - pz)));
     tripletList.push_back(Eigen::Triplet<double> (i, ind(x + 1, y, z), px * (1 - py) * (1 - pz)));
