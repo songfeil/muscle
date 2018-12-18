@@ -5,11 +5,15 @@
 
 #include "Eigen/Core"
 
+// Given points along a curve, genereate point clouds and normals from circles
+// around the curve for the purpose of Poisson Surface Reconstruction.
 void volume_along_curve(const Eigen::MatrixXd & curve,
                         const Eigen::MatrixXd & normal,
                         Eigen::MatrixXd & volume,
                         Eigen::MatrixXd & pointNormal);
 
+// Given points and other interpolated ellipse parameters along a curve, genereate
+// point clouds and normals from ellipses around the curve for the purpose of Poisson Surface Reconstruction.
 void ellipse_along_curve(const Eigen::MatrixXd & curve,
                         const Eigen::MatrixXd & normal,
                         const Eigen::VectorXd & long_axis,

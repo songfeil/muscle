@@ -5,7 +5,7 @@
 #include <iostream>
 #include <igl/arap.h>
 #include "generate_muscle.h"
-#include "bezier.h"
+#include "control_curve.h"
 #include "volume_along_curve.h"
 #include "poisson_surface_reconstruction.h"
 #include "triangle_hunt.h"
@@ -19,10 +19,17 @@
 #include <set>
 #include <vector>
 #include <move_patch.h>
-#include <PCA_elipse.h>
+#include <PCA_ellipse.h>
 #include <igl/per_vertex_attribute_smoothing.h>
 #include <igl/rotation_matrix_from_directions.h>
 
+// Construct patch mesh originally coming from a larger mesh,
+// with all indices into V, F converted to local indexing
+// V, F: larger mesh where the patch mesh comes from
+// curr_patch: indices into rows of F that indicate faces included
+//             in the small patch mesh
+// Vpatch, Fpatch: output patch mesh with local indexing
+// Vidx: list that maps the local index of vertices to the original global index
 void construct_mesh(int * Vidx, const Eigen::MatrixXd & V,
                     const Eigen::MatrixXi & F,
                     Eigen::MatrixXi & curr_patch,
@@ -50,34 +57,32 @@ void construct_mesh(int * Vidx, const Eigen::MatrixXd & V,
             }
         }
     }
-    std::cout << "Fpatch finished" <<std::endl;
     Vpatch.resize(numdistinct, 3);
     for (int i = 0; i < numdistinct; i++) {
-        std::cout << Vidx[i] << std::endl;
         Vpatch.row(i) = V.row(Vidx[i]);
     }
-    std::cout << "Vpatch finished" <<std::endl;
 }
 
+// Find top k closest patches on the mesh (V,F) from center
 void get_closest_patch(const Eigen::MatrixXd & V,
                         const Eigen::MatrixXi & F,
-                        int sourcenum1,
-                        Eigen::RowVector3d center1,
+                        int k,
+                        Eigen::RowVector3d center,
                         Eigen::MatrixXi & closest1) {
     Eigen::MatrixXd lst_dist(F.rows(), 1);
-    triangle_hunt_lst(center1, V, F, lst_dist);
+    triangle_hunt_lst(center, V, F, lst_dist);
     Eigen::MatrixXd sY;
     Eigen::MatrixXi sIX;
     igl::sort(lst_dist, 1, true, sY, sIX);
 
-    closest1 = sIX.block(0, 0, sourcenum1, 1);
+    closest1 = sIX.block(0, 0, k, 1);
 }
 
-
+// Interpolate the ellipse parameters
 void interpolate_ellipse(
         int npoints,
-        struct elipse_param ep,
-        struct elipse_param epm,
+        struct ellipse_param ep,
+        struct ellipse_param epm,
         Eigen::MatrixXd & curve,
         Eigen::MatrixXd & normal,
         Eigen::MatrixXd & long_dir,
@@ -155,15 +160,12 @@ void attach_muscle( const Eigen::MatrixXd & V,
         int curr = std::distance(selected_faces.begin(), it);
         // Our current selected triangle on the bone
         Eigen::RowVectorXi triangle = (*it).row(0);
-        std::cout<<triangle<<std::endl;
         Eigen::Matrix3d P = Eigen::Matrix3d::Zero();
         P.row(0) = V.row(triangle(0));
         P.row(1) = V.row(triangle(1));
         P.row(2) = V.row(triangle(2));
-        std::cout<<"selected triangle"<<std::endl;
-        std::cout<<P<<std::endl;
         // Find the closest triangle on the muscle
-        int fi = triangle_hunts(P, Vm, Fm);
+        int fi = triangle_hunt(P, Vm, Fm);
         Eigen::RowVector3i f = Fm.row(fi);
         attached_vids.insert(f(0));
         attached_vids.insert(f(1));
@@ -193,35 +195,29 @@ void attach_muscle( const Eigen::MatrixXd & V,
     
     Eigen::VectorXi bb_all = Eigen::VectorXi(bb.rows() + bb_fixed.rows());
     if (bb_fixed.rows() > 0){
-        std::cout << "boop1" << std::endl;
         bb_all << bb, bb_fixed;
-        std::cout << bb_all << std::endl;
     }
     else {
-        std::cout << "boop2" << std::endl;
         bb_all = bb;
     }
     igl::ARAPData data;
     igl::arap_precomputation(Vm, Fm, 3, bb_all, data);
-    std::cout << "boop3" << std::endl;
     int ninterp = 10;
     for (int ni = 1; ni <= ninterp; ni++) {
         double t = double (ni) / double (ninterp);
-        //std::cout<< (1-t)*Fcc + t*Bcc <<std::endl;
         Eigen::MatrixXd currdest = (1-t)*musclef + t*Bonedest;
         Eigen::MatrixXd all_verts(currdest.rows() + fixed_verts.rows(), 3);
         if (fixed_verts.rows() > 0) {
-            std::cout << "all verts"<< std::endl;
             all_verts << currdest, fixed_verts;
         }
         else {
             all_verts = currdest;
         }
         igl::arap_solve(all_verts, data, Vm);
-    }    
-    std::cout << "attach muscle?" << std::endl;                    
+    }
 }
 
+// Convert cartesian coordinate to polar coordinate
 void card2pol(Eigen::MatrixXd & PCAproj, Eigen::MatrixXd & PCApol) {
     for (int i = 0; i < PCApol.rows(); i++) {
         double r = PCAproj.row(i).norm();
@@ -284,12 +280,8 @@ void attach_muscle_multiface( const Eigen::MatrixXd & V,
         int Vidx[3*curr_patch.rows()];
         construct_mesh(Vidx, V, F, curr_patch, Vpatch1, Fpatch1);
 
-        std::cout<<"construct mesh " <<std::endl;
         Eigen::RowVector3d center1 = Eigen::RowVector3d::Zero();
         int curr = std::distance(selected_faces.begin(), it);
-//        if (curr == 1) {
-//            break;
-//        }
         for (int i = 0; i < curr_patch.rows(); i++) {
             num1 += 1;
             Eigen::RowVectorXi triangle = curr_patch.row(i);
@@ -307,14 +299,11 @@ void attach_muscle_multiface( const Eigen::MatrixXd & V,
         // Determine the total number of faces on the muscle to be connected and
         // generate a muscle patch
         int sourcenum1 = ceil(area1 / avg_area);
-        std::cout << sourcenum1 <<std::endl;
         Eigen::MatrixXi closest1;
         get_closest_patch(Vm, Fm, sourcenum1, center1, closest1);
-        std::cout<<"get closest patch m " <<std::endl;
         Eigen::MatrixXi Fmpatch1;
         Eigen::MatrixXd Vmpatch1;
         int Vmidx[Fm.rows()*3];
-        std::cout<<closest1<<std::endl;
         Eigen::MatrixXi closest_patch(closest1.rows(), 3);
         // igl slice
         for (int i = 0; i < closest1.rows(); i++) {
@@ -324,15 +313,14 @@ void attach_muscle_multiface( const Eigen::MatrixXd & V,
 
         // Adding the vertices of the new muscle attachment points to our list
         // So that future deformations ensure these vertices remain fixed
-        std::cout << "collecting attached VIDS" << std::endl;
         for (int i = 0; i < closest_patch.rows(); i++) {
             for (int j = 0; j < 3; j++) {
                 attached_vids.insert(closest_patch(i, j));
             }
         }
 
-        struct elipse_param ep = PCA_param(Vpatch1, Fpatch1);
-        struct elipse_param epm = PCA_param(Vmpatch1, Fmpatch1);
+        struct ellipse_param ep = PCA_param(Vpatch1, Fpatch1);
+        struct ellipse_param epm = PCA_param(Vmpatch1, Fmpatch1);
 
         // Project to PCA basis
         ep.long_dir.normalize();
@@ -366,10 +354,6 @@ void attach_muscle_multiface( const Eigen::MatrixXd & V,
 
         // Rotate the bone patch by aligning the patch normal to that of muscle patch
         Eigen::Matrix3d rotation_mat = igl::rotation_matrix_from_directions(bon_vecnormal, mus_vecnormal);
-
-        std::cout << "rotation mat" <<std::endl;
-        std::cout << rotation_mat <<std::endl;
-        std::cout << rotation_mat * bon_vecnormal <<std::endl;
 
         // Translate the bone patch center to the muscle patch center
         Eigen::MatrixXd Vpatch1_centered(Vpatch1.rows(), 3);
@@ -550,7 +534,6 @@ void attach_muscle_multiface( const Eigen::MatrixXd & V,
     Eigen::VectorXi bb_all = Eigen::VectorXi(bb.rows() + bb_fixed.rows());
     if (bb_fixed.rows() > 0){
         bb_all << bb.segment(0, curr_num), bb_fixed;
-        std::cout << bb_all << std::endl;
     }
     else {
         bb_all = bb.segment(0, curr_num);
@@ -560,7 +543,6 @@ void attach_muscle_multiface( const Eigen::MatrixXd & V,
     int ninterp = 10;
     for (int ni = 1; ni <= ninterp; ni++) {
         double t = double (ni) / double (ninterp);
-        //std::cout<< (1-t)*Fcc + t*Bcc <<std::endl;
         Eigen::MatrixXd currdest = (1-t)*musclef.block(0, 0, curr_num ,3) + t*Bonedest.block(0, 0, curr_num ,3);
         Eigen::MatrixXd all_verts(currdest.rows() + fixed_verts.rows(), 3);
         if (fixed_verts.rows() > 0) {
@@ -607,12 +589,8 @@ void attach_tendon(const Eigen::MatrixXd & V,
         int Vidx[3*curr_patch.rows()];
         construct_mesh(Vidx, V, F, curr_patch, Vpatch1, Fpatch1);
 
-        std::cout<<"construct mesh " <<std::endl;
         Eigen::RowVector3d center1 = Eigen::RowVector3d::Zero();
         int curr = std::distance(selected_faces.begin(), it);
-//        if (curr == 1) {
-//            break;
-//        }
         for (int i = 0; i < curr_patch.rows(); i++) {
             num1 += 1;
             Eigen::RowVectorXi triangle = curr_patch.row(i);
@@ -630,14 +608,11 @@ void attach_tendon(const Eigen::MatrixXd & V,
         // Determine the total number of faces on the muscle to be connected and
         // generate a muscle patch
         int sourcenum1 = ceil(area1 / avg_area);
-        std::cout << sourcenum1 <<std::endl;
         Eigen::MatrixXi closest1;
         get_closest_patch(Vm, Fm, sourcenum1, center1, closest1);
-        std::cout<<"get closest patch m " <<std::endl;
         Eigen::MatrixXi Fmpatch1; 
         Eigen::MatrixXd Vmpatch1;
         int Vmidx[Fm.rows()*3];
-        std::cout<<closest1<<std::endl;
         Eigen::MatrixXi closest_patch(closest1.rows(), 3);
         // igl slice
         for (int i = 0; i < closest1.rows(); i++) {
@@ -647,17 +622,14 @@ void attach_tendon(const Eigen::MatrixXd & V,
 
         // Adding the vertices of the new muscle attachment points to our list
         // So that future deformations ensure these vertices remain fixed
-        std::cout << "collecting attached VIDS" << std::endl;
         for (int i = 0; i < closest_patch.rows(); i++) {
             for (int j = 0; j < 3; j++) {
                 attached_vids.insert(closest_patch(i, j));
             }
         }
 
-        std::cout<<"construct mesh  " <<std::endl;
-
-        struct elipse_param ep = PCA_param(Vpatch1, Fpatch1);
-        struct elipse_param epm = PCA_param(Vmpatch1, Fmpatch1);
+        struct ellipse_param ep = PCA_param(Vpatch1, Fpatch1);
+        struct ellipse_param epm = PCA_param(Vmpatch1, Fmpatch1);
 
         // Linearly interpolate the parameters of ellipse for poisson reconstruction
         Eigen::MatrixXd tendonV, tendonN;
@@ -675,50 +647,7 @@ void attach_tendon(const Eigen::MatrixXd & V,
         Eigen::Vector3d t = Eigen::Vector3d::Ones() * 1;
         translate_V(Vmpatch1, t);
 
-        std::cout << "elipse ep print" << std::endl;
-        std::cout << ep.long_axis << std::endl;
-        std::cout << ep.long_dir << std::endl;
-        std::cout << ep.short_axis << std::endl;
-        std::cout << ep.short_dir << std::endl;
-        std::cout << ep.center << std::endl;
-        std::cout << ep.normal << std::endl;
-
-        std::cout << "elipse epm print" << std::endl;
-        std::cout << epm.long_axis << std::endl;
-        std::cout << epm.long_dir << std::endl;
-        std::cout << epm.short_axis << std::endl;
-        std::cout << epm.short_dir << std::endl;
-        std::cout << epm.center << std::endl;
-        std::cout << epm.normal << std::endl;
-
         VV.push_back(Vt);
         FF.push_back(Ft);
-//        map_move_patch(Vmpatch1, Fmpatch1, Vpatch1, Fpatch1, musVNew);
-//
-//        Eigen::VectorXi bnd;
-//        igl::boundary_loop(Fmpatch1,bnd);
-//
-//        Eigen::MatrixXd bnd_uv;
-//        igl::map_vertices_to_circle(Vmpatch1,bnd,bnd_uv);
-//
-//        Eigen::MatrixXd V_uv;
-//        igl::harmonic(Vmpatch1,Fmpatch1,bnd,bnd_uv,1,V_uv);
-//
-//        std::cout << V_uv << std::endl;
-//
-//        Eigen::VectorXi bb = Eigen::VectorXi(bnd.rows());
-//        for (int i = 0; i < bnd.rows(); i++) {
-//            bb(i) = Vmidx[bnd(i)];
-//        }
-//        Eigen::MatrixXd Bonedest(bnd.rows(), 3);
-//        for (int i = 0; i < bnd.rows(); i++) {
-//            Bonedest.row(i) = musVNew.row(bnd(i));
-//        }
-//        Eigen::MatrixXd musclef(bnd.rows(), 3);
-//        for (int i = 0; i < bnd.rows(); i++) {
-//            musclef.row(i) = Vmpatch1.row(bnd(i));
-//        }
-//        std::cout << "end " << std::endl;
-
     }
 }

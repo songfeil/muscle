@@ -12,7 +12,8 @@
 #include <Eigen/Eigenvalues>
 #include <iostream>
 
-struct elipse_param
+// Struct that combines the parameters defining an ellipse
+struct ellipse_param
 {
     double long_axis;
     double short_axis;
@@ -22,19 +23,17 @@ struct elipse_param
     Eigen::MatrixXd normal;
 };
 
-struct elipse_param PCA_param(Eigen::MatrixXd Vpatch, Eigen::MatrixXi Fpatch) {
-    struct elipse_param result;
+// Given a patch mesh specified by Vpatch and Fpatch, fit an ellipse
+// using PCA by setting the first two principal directions as long and short axis
+// and the last principal direction as normal
+struct ellipse_param PCA_param(Eigen::MatrixXd Vpatch, Eigen::MatrixXi Fpatch) {
+    struct ellipse_param result;
     Eigen::MatrixXd center = Vpatch.colwise().mean();
     result.center = center;
-    std::cout << "elipse param center" << std::endl;
-    std::cout<<center<<std::endl;
     Eigen::MatrixXd P(Vpatch.rows(), 3);
     for (int i = 0; i < Vpatch.rows(); i++) {
         P.row(i) = Vpatch.row(i) - center;
     }
-
-    std::cout << "elipse param P" << std::endl;
-    std::cout<<P<<std::endl;
 
     // Eigen decomposition on P^T * P
     Eigen::SelfAdjointEigenSolver<Eigen::MatrixXd> es(P.transpose() * P);

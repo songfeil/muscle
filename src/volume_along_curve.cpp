@@ -3,14 +3,6 @@
 #include <iostream>
 #include <functional>
 
-void generate_circle(const int n, const double radius, Eigen::MatrixXd & V) {
-    V = Eigen::MatrixXd::Zero(n, 2);
-    for (int i = 0; i < n; i++) {
-        double theta = ((double)i / n) * 2 * M_PI;
-        V.row(i) = Eigen::Vector2d(radius * cos(theta), radius * sin(theta));
-    }
-}
-
 void generate_disk(const int n, const double a, const double b, Eigen::MatrixXd & V, Eigen::MatrixXd & N) {
     V = Eigen::MatrixXd::Zero(n, 2);
     N = Eigen::MatrixXd::Zero(n, 2);
@@ -76,7 +68,6 @@ void volume_along_curve(const Eigen::MatrixXd & curve,
     for (int i = 0; i < n; i++) {
         double radius = radiusFunc(0.5, (double)i/n);
         Eigen::MatrixXd circle2D, circle2dNorm;
-//      generate_circle(circleSampleCount, radius, circle2D);
         generate_disk(circleSampleCount, radius, radius * 1, circle2D, circle2dNorm);
 
         Eigen::Vector3d N, T, B, pos;
@@ -89,21 +80,13 @@ void volume_along_curve(const Eigen::MatrixXd & curve,
         Eigen::MatrixXd transform = Eigen::MatrixXd(3, 2);
         transform.col(0) = T;
         transform.col(1) = B;
-        // std::cout << "Normal " << N << std::endl;
-        // std::cout << transform << std::endl << std::endl;
 
         Eigen::MatrixXd scaleCircle2D = circle2D;
         Eigen::MatrixXd tCircle = (transform * scaleCircle2D.transpose()).transpose();
         Eigen::MatrixXd tNorm = (transform * circle2dNorm.transpose()).transpose();
-//      Eigen::MatrixXd tCircle = Eigen::MatrixXd(circle2D.rows(), 3);
-//      for (int j = 0; j < tCircle.rows(); j++) {
-//        Eigen::Vector3d pt = circle2D.row(j);
-//        tCircle.row(j) = transform * pt;
-//      }
         for (int j = 0; j < tCircle.rows(); j++) {
             tCircle.row(j) += curve.row(i);
             volume.row(i * circleSampleCount + j) = tCircle.row(j);
-//        pointNormal.row(i * circleSampleCount + j) = volume.row(i * circleSampleCount + j) - curve.row(i);
             pointNormal.row(i * circleSampleCount + j) = tNorm.row(j);
         }
     }
@@ -144,7 +127,6 @@ void ellipse_along_curve(const Eigen::MatrixXd & curve,
     for (int i = 0; i < n; i++) {
         double radius = radiusFunc(0.5, (double)i/n);
         Eigen::MatrixXd circle2D, circle2dNorm;
-//      generate_circle(circleSampleCount, radius, circle2D);
         generate_disk(circleSampleCount, long_axis(i), short_axis(i), circle2D, circle2dNorm);
 
         Eigen::Vector3d N, T, B, pos;
@@ -157,23 +139,16 @@ void ellipse_along_curve(const Eigen::MatrixXd & curve,
         Eigen::MatrixXd transform = Eigen::MatrixXd(3, 2);
         transform.col(0) =  long_dir.row(i).transpose(); // long axis
         transform.col(1) = short_dir.row(i).transpose(); // short axis
-        // std::cout << "Normal " << N << std::endl;
-        // std::cout << transform << std::endl << std::endl;
 
         Eigen::MatrixXd scaleCircle2D = circle2D;
         Eigen::MatrixXd tCircle = (transform * scaleCircle2D.transpose()).transpose();
 
         // Normal of the surface may not be the normal of the ellipse transformed
         Eigen::MatrixXd tNorm = (transform * circle2dNorm.transpose()).transpose();
-//      Eigen::MatrixXd tCircle = Eigen::MatrixXd(circle2D.rows(), 3);
-//      for (int j = 0; j < tCircle.rows(); j++) {
-//        Eigen::Vector3d pt = circle2D.row(j);
-//        tCircle.row(j) = transform * pt;
-//      }
+
         for (int j = 0; j < tCircle.rows(); j++) {
             tCircle.row(j) += curve.row(i);
             volume.row(i * circleSampleCount + j) = tCircle.row(j);
-//        pointNormal.row(i * circleSampleCount + j) = volume.row(i * circleSampleCount + j) - curve.row(i);
             pointNormal.row(i * circleSampleCount + j) = tNorm.row(j);
         }
     }
