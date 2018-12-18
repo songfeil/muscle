@@ -9,7 +9,7 @@
 
 // Generate a Catmull Rom Spline curve given the control points p and
 // output nsample points along the curve in C as well as their
-// respective normals in N
+// respective tangents in N
 void CatmullRomChain(const Eigen::MatrixXd & p,
             const int nsample,
             Eigen::MatrixXd & C,
