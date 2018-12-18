@@ -13,6 +13,7 @@
 #include <igl/harmonic.h>
 #include <math.h>
 
+// Calculate the center point for given vertices
 Eigen::Vector3d calc_center(Eigen::MatrixXd & V) {
     Eigen::Vector3d sum(0, 0, 0);
     for (int i = 0; i < V.rows(); i++) {
@@ -22,12 +23,14 @@ Eigen::Vector3d calc_center(Eigen::MatrixXd & V) {
     return sum;
 }
 
+// Translate vertices V by vector t
 void translate_V(Eigen::MatrixXd & V, const Eigen::Vector3d & t) {
     for (int i = 0; i < V.rows(); i++) {
         V.row(i) += t.transpose();
     }
 }
 
+// Uniform scaling for vertices V by s
 void origin_scaling(Eigen::MatrixXd & V, double s) {
     Eigen::Vector3d center = calc_center(V);
     translate_V(V, -center);
@@ -35,6 +38,7 @@ void origin_scaling(Eigen::MatrixXd & V, double s) {
     translate_V(V, center);
 }
 
+// Search for the given rad angle is between which two indices of angle lists
 int between_vertices(double query_rad, const Eigen::VectorXd & rads) {
     // All rads between 2 * PI - 0
     int size = rads.size();
@@ -47,11 +51,12 @@ int between_vertices(double query_rad, const Eigen::VectorXd & rads) {
         }
     }
 
-    std::cout << "return -1\n";
+//    std::cout << "return -1\n";
 
     return size - 1;
 }
 
+// Move patch using translate method
 void translate_move_patch(
         Eigen::MatrixXd & musV,
         Eigen::MatrixXi & musF,
@@ -71,6 +76,7 @@ void translate_move_patch(
     translate_V(musV, hit.t * direction);
 }
 
+// Move patch by parameterization
 void map_move_patch(
         Eigen::MatrixXd & musV,
         Eigen::MatrixXi & musF,
@@ -130,14 +136,14 @@ void map_move_patch(
     Eigen::MatrixXd musU, musBND_U;
     igl::harmonic(musV,musF,musBND,mus_uv,1,musU);
 
-    std::cout << "bon_boundary" << std::endl;
-    for (int i = 0; i < bonBND.size(); i++) {
-        std::cout<<bonV.row(bonBND(i))<<std::endl;
-    }
-    std::cout << "mus_boundary" << std::endl;
-    for (int i = 0; i < musBND.size(); i++) {
-        std::cout<<musV.row(musBND(i)) <<std::endl;
-    }
+//    std::cout << "bon_boundary" << std::endl;
+//    for (int i = 0; i < bonBND.size(); i++) {
+//        std::cout<<bonV.row(bonBND(i))<<std::endl;
+//    }
+//    std::cout << "mus_boundary" << std::endl;
+//    for (int i = 0; i < musBND.size(); i++) {
+//        std::cout<<musV.row(musBND(i)) <<std::endl;
+//    }
 
     bonBND_U.resize(bonBND.size(), 2);
     for (int i = 0; i < bonBND.size(); i++) {
@@ -168,11 +174,11 @@ void map_move_patch(
 
     }
 
-    std::cout << "mus_bound_rad" <<std::endl;
-    std::cout << mus_bound_rad <<std::endl;
+//    std::cout << "mus_bound_rad" <<std::endl;
+//    std::cout << mus_bound_rad <<std::endl;
 
 
-    std::cout << "info loaded" << std::endl;
+//    std::cout << "info loaded" << std::endl;
 
     musVNew = musV;
     for (int i = 0; i < mus_bound_rad.size(); i++) {
@@ -181,7 +187,7 @@ void map_move_patch(
         int idx = between_vertices(q, bon_bound_rad);
         int idy = (idx + 1) % bon_bound_rad.size();
 
-        std::cout << "query" << q << " between " << bon_bound_rad(idx) << "and" << bon_bound_rad(idy) << std::endl;
+//        std::cout << "query" << q << " between " << bon_bound_rad(idx) << "and" << bon_bound_rad(idy) << std::endl;
 
         double brady = idy == 0 ? bon_bound_rad(idy) - 2 * M_PI : bon_bound_rad(idy);
 
@@ -189,12 +195,12 @@ void map_move_patch(
         double query_interval = bon_bound_rad(idx) - q;
         double percentage = query_interval / interval;
 
-        std::cout << "percentage " << percentage <<std::endl;
+//        std::cout << "percentage " << percentage <<std::endl;
 
         Eigen::RowVector3d new_pos = (1 - percentage) * bonV.row(idx) + (percentage) * bonV.row(idy);
         musVNew.row(musBND(i)) = new_pos;
     }
-    std::cout << "cal finished" << std::endl;
+//    std::cout << "cal finished" << std::endl;
 
 }
 
